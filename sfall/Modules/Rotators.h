@@ -11,5 +11,6 @@ namespace sfall
         const char* name() { return "Rotators"; }
         void init();
         void exit() override;
+		static void OnWmRefresh();
     };
 }

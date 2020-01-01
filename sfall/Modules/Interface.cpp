@@ -20,6 +20,7 @@
 #include "..\FalloutEngine\Fallout2.h"
 #include "Graphics.h"
 #include "LoadGameHook.h"
+#include "Rotators.h"
 
 #include "Interface.h"
 
@@ -520,6 +521,8 @@ static void __declspec(naked) wmInterfaceRefresh_hook() {
 
 		// TODO: fix dots for car travel
 	}
+
+	Rotators::OnWmRefresh();
 
 	__asm {
 		mov esp, ebp; // epilog
