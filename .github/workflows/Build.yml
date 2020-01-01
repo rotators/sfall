@@ -1,0 +1,90 @@
+name: Build
+
+on:
+ push:
+  paths:
+  - '.github/workflows/Build.yml'
+  - 'sfall/**'
+
+jobs:
+ Build:
+  name:    ${{ matrix.toolset }}
+  runs-on: windows-latest
+  strategy:
+   matrix:
+    toolset: [v142]
+  steps:
+
+  - name:  Config
+    run:   |
+           :
+           echo ::set-env name=DXSDK_DIR::$HOME/cache/
+    shell: bash
+
+  - name: Clone
+    uses: actions/checkout@v2
+
+  - name: Cache
+    if:   github.event_name == 'push'
+    id:   cache
+    uses: actions/cache@v1
+    with:
+     path: ~/cache
+     key:  cache
+
+  - name:  Cache create
+    if:    steps.cache.outputs.cache-hit != 'true'
+    run:   |
+           :
+           echo ::group::DX2010
+           curl -L https://download.microsoft.com/download/a/e/7/ae743f1f-632b-4809-87a9-aa1bb3458e31/DXSDK_Jun10.exe -o _DX2010_.exe
+           7z x _DX2010_.exe DXSDK/Include -o_DX2010_
+           7z x _DX2010_.exe DXSDK/Lib/x86 -o_DX2010_
+           mv _DX2010_/DXSDK $HOME/cache
+           echo ::endgroup::
+
+           echo ::group::DX2007
+           curl -L https://download.microsoft.com/download/3/3/f/33f1af6e-c61b-4f14-a0de-3e9096ed4b3a/DXSDK_Aug2007.exe -o _DX2007_.exe
+           7z x _DX2007_.exe -o_DX2007_
+           7z x _DX2007_/DXSDK_Aug2007.exe Lib/x86 -o_DX2007_
+           cp _DX2007_/Lib/x86/dinput.lib $HOME/cache/Lib/x86
+           echo ::endgroup::
+
+           echo ::group::vswhere
+           curl -L https://github.com/microsoft/vswhere/releases/latest/download/vswhere.exe -o $HOME/cache/vswhere.exe
+           echo ::endgroup::
+
+           # clean & check
+           rm -fR _DX*_ _DX*_.exe
+           git status
+
+           #ls -Ra $HOME/cache
+           du -hd0 $HOME/cache
+    shell: bash
+
+  - name:  Build
+    run:   |
+           :
+           if [ "${{ matrix.toolset }}" == "v142" ]; then
+              sed -ri 's!<EnableEnhancedInstructionSet>NoExtensions</EnableEnhancedInstructionSet>!<EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>!' sfall/ddraw.vcxproj
+           fi
+
+           echo "@echo off" > sfall/PostBuild.cmd
+           "$($HOME/cache/vswhere.exe -latest -requires Microsoft.Component.MSBuild -find MSBuild/**/Bin/MSBuild.exe)" sfall/ddraw.sln -p:Configuration=ReleaseXP -p:Platform=Win32 -p:PlatformToolset=${{ matrix.toolset }}
+    shell: bash
+
+  - name:  Build check
+    run:   |
+           :
+           ddraw="sfall/ReleaseXP/ddraw"
+           file $ddraw.dll
+           ldd  $ddraw.dll
+
+           mkdir -p ddraw
+           mv $ddraw.dll ddraw/ddraw.rotators.dll
+    shell: bash
+
+  - uses: actions/upload-artifact@v1
+    with:
+     name: ddraw
+     path: ddraw

@@ -61,6 +61,7 @@
 #include "Modules\Perks.h"
 #include "Modules\PlayerModel.h"
 #include "Modules\Premade.h"
+#include "Modules\Rotators.h"
 #include "Modules\QuestList.h"
 #include "Modules\Reputations.h"
 #include "Modules\ScriptExtender.h"
@@ -210,6 +211,7 @@ static void InitModules() {
 	manager.add<ScriptExtender>();
 
 	manager.add<DebugEditor>();
+	manager.add<Rotators>();
 
 	manager.initAll();
 

@@ -286,6 +286,9 @@
     </ClInclude>
     <ClInclude Include="CRC.h" />
     <ClInclude Include="CheckAddress.h" />
+    <ClInclude Include="Modules\Rotators.h">
+      <Filter>Modules</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
@@ -532,6 +535,9 @@
     </ClCompile>
     <ClCompile Include="CRC.cpp" />
     <ClCompile Include="CheckAddress.cpp" />
+    <ClCompile Include="Modules\Rotators.cpp">
+      <Filter>Modules</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="version.rc" />
