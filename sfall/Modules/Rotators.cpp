@@ -19,9 +19,14 @@ static void InitCustomDll()
         if( name.empty() )
             continue;
 
-        sfall::dlog_f( "Loading custom dll %s", DL_MAIN, name.c_str() );
+        sfall::dlog_f( "Loading %s... ", DL_MAIN, name.c_str() );
 
-        LoadLibraryA( name.c_str() );
+        HMODULE dll = LoadLibraryA( name.c_str() );
+
+        if( !dll || dll == INVALID_HANDLE_VALUE )
+            sfall::dlogr( "ERROR" );
+        else
+            sfall::dlogr( "OK" );
     }
 }
 

@@ -82,6 +82,7 @@ jobs:
 
            mkdir -p ddraw
            mv $ddraw.dll ddraw/ddraw.rotators.dll
+           cp artifacts/ddraw.rotators.ini ddraw
     shell: bash
 
   - uses: actions/upload-artifact@v1
