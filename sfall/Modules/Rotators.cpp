@@ -6,12 +6,12 @@
 #include "..\FalloutEngine\Fallout2.h"
 
 #ifdef HTTPD_SERVER
-  #include <thread>
-  #include "..\Lib\EmbeddableWebServer.h"
+	#include <thread>
+	#include "..\Lib\EmbeddableWebServer.h"
 
-  void InitHTTPD();
-  static struct Server server;
-  std::thread thread;
+	void InitHTTPD();
+	static struct Server server;
+	std::thread thread;
 #endif
 
 #include "Rotators.h"
@@ -27,9 +27,25 @@ bool displayTerrainOnHotspot;
 BYTE terrainOnHotspotTextColor;
 BYTE terrainOnHotspotShadowColor;
 
+// Any and all configuration should be read from ddraw.rotators.ini; /artifacts/ddraw.rotators.ini should be updated to reflect code, when possible;
+// adds some extra work on PR/merge, but pays off in a long run
+/*static*/ struct Ini {
+	static std::string String(const char* section, const char* setting, const char* defaultValue) {
+		return sfall::GetIniString(section, setting, defaultValue, 512, rotatorsIni);
+	}
+
+	static int Int(const char* section, const char* setting, int defaultValue) {
+		return sfall::iniGetInt(section, setting, defaultValue, rotatorsIni);
+	}
+
+	static std::vector<std::string> List(const char* section, const char* setting, const char* defaultValue, char delim = ',') {
+		return sfall::GetIniList(section, setting, defaultValue, 512, delim, rotatorsIni);
+	}
+};
+
 /*** https://github.com/phobos2077/sfall/pull/273 ***/
 static void InitLoadDll() {
-	std::vector<std::string> names = sfall::GetIniList("Main", "LoadDll", "", 512, ',', rotatorsIni);
+	std::vector<std::string> names = Ini::List("Main", "LoadDll", "");
 
 	for (const auto& name : names) {
 		if (name.empty())
@@ -127,9 +143,8 @@ void WmDrawText(char* text, BYTE colorIndex, DWORD x, DWORD y, DWORD txtWidth) {
 	FMTextToBuffer((void*)buf, text, colorIndex, x, y, txtWidth, 890); // 890=width of wm buffer
 }
 
-// Called from Interface.cpp
+// Called from Interface.cpp wmInterfaceRefresh_hook()
 void sfall::Rotators::OnWmRefresh() {
-	
 	if (!displayTerrainOnHotspot)
 		return;
 
@@ -142,24 +157,15 @@ void sfall::Rotators::OnWmRefresh() {
 		WmDrawText((char*)currentTerrainStr, terrainOnHotspotShadowColor, x, y + 5, 60);  // Shadow
 		WmDrawText((char*)currentTerrainStr, terrainOnHotspotTextColor, x - 1, y + 4, 60);
 	}
-	
 	SetFont(oldFont);
-}
-
-static std::string GetConfigString(const char* section, const char* setting, const char* defaultValue) {
-	return sfall::GetIniString(section, setting, defaultValue, 512, rotatorsIni);
-}
-
-static int GetConfigInt(const char* section, const char* setting, int defaultValue) {
-	return sfall::iniGetInt(section, setting, defaultValue, rotatorsIni);
 }
 
 // https://i.imgur.com/0bu4J2l.png
 static void InitTerrainHover()
 {
-	displayTerrainOnHotspot     = GetConfigInt("Interface", "DisplayTerrainOnHotspotHover", 0);
-	terrainOnHotspotTextColor   = GetConfigInt("Interface", "TerrainOnHotspotTextColor", 215);
-	terrainOnHotspotShadowColor = GetConfigInt("Interface", "TerrainOnHotspotTextShadowColor", 228);
+	displayTerrainOnHotspot     = Ini::Int("Interface", "DisplayTerrainOnHotspotHover", 0);
+	terrainOnHotspotTextColor   = Ini::Int("Interface", "TerrainOnHotspotTextColor", 215);
+	terrainOnHotspotShadowColor = Ini::Int("Interface", "TerrainOnHotspotTextShadowColor", 228);
 	if(displayTerrainOnHotspot)
 		sfall::MakeJump(0x4BFE84, wmDetectHotspotHover);
 	currentTerrainStr = "";
@@ -170,25 +176,25 @@ void sfall::Rotators::init()
 	InitLoadDll();
 	InitTerrainHover();
 	#ifdef HTTPD_SERVER
-	  thread = std::thread(InitHTTPD);
+	thread = std::thread(InitHTTPD);
 	#endif
 }
 
 void sfall::Rotators::exit()
 {
 	#ifdef HTTPD_SERVER
-	  serverDeInit(&server);
-	  thread.join();
+	serverDeInit(&server);
+	thread.join();
 	#endif
 }
 
-// Move this somewhere else?
+// Move this somewhere else, when/if it grows too much
 #ifdef HTTPD_SERVER
 std::string DocumentRoot;
 
 void InitHTTPD()
 {
-	DocumentRoot = GetConfigString("HTTP", "DocumentRoot", ".");
+	DocumentRoot = Ini::String("HTTP", "DocumentRoot", ".");
 	serverInit(&server);
 	struct sockaddr_in localhost = { 0 };
 	localhost.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
