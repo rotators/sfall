@@ -466,8 +466,12 @@ struct DotPosition {
 };
 static std::vector<DotPosition> dots;
 
-long spaceLen = 2;
-long dotLen = 1;
+static long optionLenDot = 1;
+static long optionSpaceDot = 2;
+
+static unsigned char colorDot = 133; // color index in palette: R = 252, G = 0, B = 0
+static long spaceLen = 2;
+static long dotLen = 1;
 static long dot_xpos = 0;
 static long dot_ypos = 0;
 BYTE dot_color = 133;
@@ -478,7 +482,7 @@ static void AddNewDot() {
 
 	if (dotLen <= 0 && spaceLen) {
 		spaceLen--;
-		if (!spaceLen) dotLen = 1; // set dot length
+		if (!spaceLen) dotLen = optionLenDot; // set dot length
 		return;
 	}
 	dotLen--;
@@ -488,18 +492,17 @@ static void AddNewDot() {
 	dot.y = dot_ypos;
 	dots.push_back(std::move(dot));
 
-	spaceLen = 2;
+	spaceLen = optionSpaceDot;
 }
 
-static void __declspec(naked) wmInterfaceRefresh_hook() {
+static void __declspec(naked) DrawingDots() {
 	long x_offset,  y_offset;
 	__asm {
-		pushad;
 		mov ebp, esp; // prolog
 		sub esp, __LOCAL_SIZE;
 	}
 
-	if ((fo::var::target_xpos || fo::var::target_ypos) && (dot_xpos != fo::var::world_xpos || dot_ypos != fo::var::world_ypos)) {
+	if (dot_xpos != fo::var::world_xpos || dot_ypos != fo::var::world_ypos) {
 		AddNewDot();
 	}
 	x_offset = 22 - fo::var::wmWorldOffsetX;
@@ -518,25 +521,26 @@ static void __declspec(naked) wmInterfaceRefresh_hook() {
 		BYTE* wmWinBuf_xy = (wmPixelY + wmPixelX) + wmWinBuf;
 
 		// put pixel to interface window buffer
-		if (wmWinBuf_xy > wmWinBuf) *wmWinBuf_xy = dot_color; // index color in palette: R = 252, G = 0, B = 0
+		if (wmWinBuf_xy > wmWinBuf) *wmWinBuf_xy = colorDot;
 
 		// TODO: fix dots for car travel
 	}
-
-	Rotators::OnWmRefresh();
-
 	__asm {
 		mov esp, ebp; // epilog
-		popad;
-		jmp fo::funcoffs::wmInterfaceDrawSubTileList_;
+		retn;
 	}
 }
 
-static void __declspec(naked) wmInterfaceRefresh_hook_stop() {
-	if (!fo::var::target_xpos && !fo::var::target_ypos) {
-		dots.clear();
-		dotLen = 1;
-		spaceLen = 2;
+static void __declspec(naked) wmInterfaceRefresh_hook() {
+	if (fo::var::target_xpos != -1) {
+		if (fo::var::In_WorldMap) {
+			DrawingDots();
+		} else if (!fo::var::target_xpos && !fo::var::target_ypos) {
+			// on stop move
+			dots.clear();
+			dotLen = optionLenDot;
+			spaceLen = optionSpaceDot;
+		}
 	}
 	__asm jmp fo::funcoffs::wmDrawCursorStopped_;
 }
@@ -604,8 +608,16 @@ static void WorldMapInterfacePatch() {
 	}
 
 	if (GetConfigInt("Interface", "WorldTravelMarkers", 0)) {
-		HookCall(0x4C3BE6, wmInterfaceRefresh_hook); // when calling wmInterfaceDrawSubTileList_
-		HookCall(0x4C3C7E, wmInterfaceRefresh_hook_stop);
+		optionLenDot = GetConfigInt("Interface", "MarkerLength", optionLenDot);
+		optionSpaceDot = GetConfigInt("Interface", "MarkerSpaces", optionSpaceDot);
+		int color = GetConfigInt("Interface", "MarkerColor", colorDot);
+
+		if (color > 255) color = 255; else if (color < 1) color = 1;
+		colorDot = color;
+		if (optionLenDot > 10) optionLenDot = 10; else if (optionLenDot < 1) optionLenDot = 1;
+		if (optionSpaceDot > 10) optionSpaceDot = 10; else if (optionSpaceDot < 1) optionSpaceDot = 1;
+
+		HookCall(0x4C3C7E, wmInterfaceRefresh_hook); // when calling wmDrawCursorStopped_
 		dots.reserve(512);
 		LoadGameHook::OnGameReset() += []() {
 			dots.clear();
