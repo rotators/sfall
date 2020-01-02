@@ -26,14 +26,6 @@ BYTE terrainOnHotspotShadowColor;
 
 std::thread thread;
 
-// Variables related to WorldTravelMarker in Interface.cpp
-namespace sfall
-{
-	extern BYTE dot_color;
-	extern long spaceLen;
-	extern long dotLen;
-}
-
 static void InitCustomDll()
 {
     std::vector<std::string> names = sfall::GetIniList( "Debugging", "CustomDll", "", 512, ',', rotatorsIni );

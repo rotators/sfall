@@ -525,6 +525,9 @@ static void __declspec(naked) DrawingDots() {
 
 		// TODO: fix dots for car travel
 	}
+
+	Rotators::OnWmRefresh();
+
 	__asm {
 		mov esp, ebp; // epilog
 		retn;
