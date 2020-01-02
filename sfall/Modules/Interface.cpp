@@ -474,7 +474,6 @@ static long spaceLen = 2;
 static long dotLen = 1;
 static long dot_xpos = 0;
 static long dot_ypos = 0;
-BYTE dot_color = 133;
 
 static void AddNewDot() {
 	dot_xpos = fo::var::world_xpos;
@@ -525,7 +524,6 @@ static void __declspec(naked) DrawingDots() {
 
 		// TODO: fix dots for car travel
 	}
-
 	__asm {
 		mov esp, ebp; // epilog
 		retn;
