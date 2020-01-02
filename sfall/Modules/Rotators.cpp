@@ -145,6 +145,10 @@ void sfall::Rotators::OnWmRefresh() {
 	SetFont(oldFont);
 }
 
+static std::string GetConfigString(const char* section, const char* setting, const char* defaultValue) {
+	return sfall::GetIniString(section, setting, defaultValue, 512, rotatorsIni);
+}
+
 static int GetConfigInt(const char* section, const char* setting, int defaultValue) {
 	return sfall::iniGetInt(section, setting, defaultValue, rotatorsIni);
 }
@@ -178,8 +182,11 @@ void sfall::Rotators::exit()
 
 // Move this somewhere else?
 #ifdef HTTPD_SERVER
+std::string DocumentRoot;
+
 void InitHTTPD()
 {
+	DocumentRoot = GetConfigString("HTTP", "DocumentRoot", ".");
 	serverInit(&server);
 	struct sockaddr_in localhost = { 0 };
 	localhost.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
@@ -189,18 +196,18 @@ void InitHTTPD()
 	acceptConnectionsUntilStopped(&server, (struct sockaddr*) & localhost, sizeof(localhost));
 }
 
+bool DoesFileExist(const char* filename) {
+	struct stat st;
+	int result = stat(filename, &st);
+	return result == 0;
+}
+
 char* respString;
 struct Response* createResponseForRequest(const struct Request* request, struct Connection* connection) {
-	if (0 == strcmp(request->pathDecoded, "/welcome")) {
-		char response[1024];
-
-		sprintf(response, "<html><body><h1>Hello from ddraw.dll</h1><p>wmPosX: %d<br/>wmPosY: %d<br/>Current Terrain: %s</p></body></html>",
-			fo::var::world_xpos,
-			fo::var::world_ypos,
-			currentTerrainStr
-		);
-
-		return responseAllocHTML(response);
+	if (0 == strcmp(request->pathDecoded, "/")
+		|| 0 == strcmp(request->pathDecoded, "/style.css")
+		|| 0 == strcmp(request->pathDecoded, "/script.js")) {
+		return responseAllocServeFileFromRequestPath("/", request->path, request->pathDecoded, DocumentRoot.c_str());
 	}
 	if (0 == strcmp(request->pathDecoded, "/status/json")) {
 		static const char* statuses[] = { ":-)", ":-(", ":-|" };
