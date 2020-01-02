@@ -27,14 +27,15 @@ bool displayTerrainOnHotspot;
 BYTE terrainOnHotspotTextColor;
 BYTE terrainOnHotspotShadowColor;
 
-static void InitCustomDll() {
-	std::vector<std::string> names = sfall::GetIniList("Debugging", "CustomDll", "", 512, ',', rotatorsIni);
+/*** https://github.com/phobos2077/sfall/pull/273 ***/
+static void InitLoadDll() {
+	std::vector<std::string> names = sfall::GetIniList("Main", "LoadDll", "", 512, ',', rotatorsIni);
 
 	for (const auto& name : names) {
 		if (name.empty())
 			continue;
 
-		sfall::dlog_f("Loading %s... ", DL_MAIN, name.c_str());
+		sfall::dlog_f("Loading %s... ", DL_INIT, name.c_str());
 
 		HMODULE dll = LoadLibraryA(name.c_str());
 
@@ -166,8 +167,8 @@ static void InitTerrainHover()
 
 void sfall::Rotators::init()
 {
-    InitCustomDll();
-    InitTerrainHover();
+	InitLoadDll();
+	InitTerrainHover();
 	#ifdef HTTPD_SERVER
 	  thread = std::thread(InitHTTPD);
 	#endif
@@ -221,6 +222,6 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
 	if (request->pathDecoded == strstr(request->pathDecoded, "/files")) {
 		return responseAllocServeFileFromRequestPath("/files", request->path, request->pathDecoded, ".");
 	}
-	return responseAlloc404NotFoundHTML("Nope");
+	return responseAlloc404NotFoundHTML("You don't see anything out of the ordinary.");
 }
 #endif
