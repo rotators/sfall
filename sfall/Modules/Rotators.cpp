@@ -1,14 +1,17 @@
 #include <string>
 #include <vector>
-#include <thread>
 
 #include "..\main.h"
 #include "..\SafeWrite.h"
 #include "..\FalloutEngine\Fallout2.h"
+
 #ifdef HTTPD_SERVER
+  #include <thread>
   #include "..\Lib\EmbeddableWebServer.h"
+
   void InitHTTPD();
   static struct Server server;
+  std::thread thread;
 #endif
 
 #include "Rotators.h"
@@ -24,26 +27,22 @@ bool displayTerrainOnHotspot;
 BYTE terrainOnHotspotTextColor;
 BYTE terrainOnHotspotShadowColor;
 
-std::thread thread;
+static void InitCustomDll() {
+	std::vector<std::string> names = sfall::GetIniList("Debugging", "CustomDll", "", 512, ',', rotatorsIni);
 
-static void InitCustomDll()
-{
-    std::vector<std::string> names = sfall::GetIniList( "Debugging", "CustomDll", "", 512, ',', rotatorsIni );
+	for (const auto& name : names) {
+		if (name.empty())
+			continue;
 
-    for( const auto& name : names )
-    {
-        if( name.empty() )
-            continue;
+		sfall::dlog_f("Loading %s... ", DL_MAIN, name.c_str());
 
-        sfall::dlog_f( "Loading %s... ", DL_MAIN, name.c_str() );
+		HMODULE dll = LoadLibraryA(name.c_str());
 
-        HMODULE dll = LoadLibraryA( name.c_str() );
-
-        if( !dll || dll == INVALID_HANDLE_VALUE )
-            sfall::dlogr( "ERROR", DL_MAIN );
-        else
-            sfall::dlogr( "OK", DL_MAIN );
-    }
+		if (!dll || dll == INVALID_HANDLE_VALUE)
+			sfall::dlogr("ERROR", DL_INIT);
+		else
+			sfall::dlogr("OK", DL_INIT);
+	}
 }
 
 int jmpBack = 0x4BFE89;
