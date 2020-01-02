@@ -53,6 +53,7 @@ void __declspec(naked) wmDetectHotspotHover() {
 	bool oldIsMouseOverHotspot;
 	__asm {
 		pushad
+		mov eax, dword ptr ss : [esp + 36] // 4+32 (because of pushad)
 		mov edx, dword ptr ss : [esp + 40]
 		mov ebp, esp
 		sub esp, __LOCAL_SIZE
