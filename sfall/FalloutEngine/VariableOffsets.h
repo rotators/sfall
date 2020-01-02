@@ -251,6 +251,7 @@
 #define FO_VAR_wmYesNoStrs                0x51DD90
 #define FO_VAR_world_xpos                 0x672E0C
 #define FO_VAR_world_ypos                 0x672E10
+#define FO_VAR_world_subtile              0x672E14
 #define FO_VAR_WorldMapCurrArea           0x672E08
 
 // colors

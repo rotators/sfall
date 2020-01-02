@@ -466,10 +466,11 @@ struct DotPosition {
 };
 static std::vector<DotPosition> dots;
 
-static long spaceLen = 2;
-static long dotLen = 1;
+long spaceLen = 2;
+long dotLen = 1;
 static long dot_xpos = 0;
 static long dot_ypos = 0;
+long dot_color = 133;
 
 static void AddNewDot() {
 	dot_xpos = fo::var::world_xpos;
@@ -517,7 +518,7 @@ static void __declspec(naked) wmInterfaceRefresh_hook() {
 		BYTE* wmWinBuf_xy = (wmPixelY + wmPixelX) + wmWinBuf;
 
 		// put pixel to interface window buffer
-		if (wmWinBuf_xy > wmWinBuf) *wmWinBuf_xy = 133; // index color in palette: R = 252, G = 0, B = 0
+		if (wmWinBuf_xy > wmWinBuf) *wmWinBuf_xy = dot_color; // index color in palette: R = 252, G = 0, B = 0
 
 		// TODO: fix dots for car travel
 	}

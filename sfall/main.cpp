@@ -132,6 +132,10 @@ unsigned int GetConfigInt(const char* section, const char* setting, int defaultV
 	return iniGetInt(section, setting, defaultValue, ini);
 }
 
+unsigned int GetConfigInt(const char* section, const char* setting, int defaultValue, const char* iniFile) {
+	return iniGetInt(section, setting, defaultValue, iniFile);
+}
+
 std::string GetConfigString(const char* section, const char* setting, const char* defaultValue, size_t bufSize) {
 	return trim(GetIniString(section, setting, defaultValue, bufSize, ini));
 }

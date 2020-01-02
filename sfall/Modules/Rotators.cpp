@@ -13,6 +13,19 @@
 const char rotatorsIni[] = ".\\ddraw.rotators.ini";
 const char* currentTerrainStr;
 
+// DisplayTerrainOnHotspotHover related variables
+bool displayTerrainOnHotspot;
+BYTE terrainOnHotspotTextColor;
+BYTE terrainOnHotspotShadowColor;
+
+// Variables related to WorldTravelMarker in Interface.cpp
+namespace sfall
+{
+	extern long dot_color;
+	extern long spaceLen;
+	extern long dotLen;
+}
+
 static void InitCustomDll()
 {
     std::vector<std::string> names = sfall::GetIniList( "Debugging", "CustomDll", "", 512, ',', rotatorsIni );
@@ -34,68 +47,42 @@ static void InitCustomDll()
 }
 
 int jmpBack = 0x4BFE89;
-int refreshwm = 0x4C3830;
-int hoveringHotspot = 0;
+bool hoveringHotspot = false;
 void __declspec(naked) wmDetectHotspotHover() {
+	int wmMouseX, wmMouseY;
+	int deltaX, deltaY;
+	bool hovered;
 	__asm {
-		push edi
-		push ebp
-		push eax
-		push edx
-		push ecx
-		mov ecx, hoveringHotspot // to check if hovering changed
-		mov edi, dword ptr ss : [esp + 28] // [esp + 8], since we pushed some registers
-		mov ebp, dword ptr ds : [0x51DE2C]
-		mov eax, dword ptr ds : [0x51DE30]
-		add edi, ebp // edi = wmMouseX
-		mov ebp, dword ptr ss : [esp + 24] // [esp + 4]
-		add ebp, eax // ebp = wmMouseY
-		sub edi, 20
-		sub ebp, 20
-		// check if the cursor is inside
-		mov eax, dword ptr ds : [0x672E0C]
-		sub eax, edi
-		cdq
-		xor eax, edx
-		sub eax, edx
-		cmp eax, 5
-		jge unset
-		mov eax, dword ptr ds : [0x672E10]
-		sub eax, ebp
-		cdq
-		xor eax, edx
-		sub eax, edx
-		cmp eax, 5
-		jge unset
-		mov hoveringHotspot, 1
-		jmp change_check
-	unset:
-		mov hoveringHotspot, 0
-	change_check:
-		cmp ecx, hoveringHotspot
-		je cleanup
-		call refreshwm // if value has changed, refresh wm
-	cleanup:
-		pop ecx
-		pop edx
-		pop eax
-		pop ebp
-		pop edi
+		pushad
+		mov ebp, esp
+		sub esp, __LOCAL_SIZE
+		mov eax, dword ptr ss : [esp + 60] // if you declare more variables above, increment this and the below esp offset
+		mov[ebp - 4], eax
+		mov eax, dword ptr ss : [esp + 64]
+		mov[ebp - 8], eax
+	}
+	hovered = hoveringHotspot;
+	deltaX = abs((long)fo::var::world_xpos - (wmMouseX - 20 + fo::var::wmWorldOffsetX));
+	deltaY = abs((long)fo::var::world_ypos - (wmMouseY - 20 + fo::var::wmWorldOffsetY));
+
+	hoveringHotspot = deltaX < 5 && deltaY < 5;
+	if (hoveringHotspot != hovered)
+		fo::func::wmInterfaceRefresh();
+
+	__asm {
+		mov esp, ebp; // restore stack
+		popad;
 		mov eax, dword ptr ds : [0x51DE30] // we overwrote it in jmp, so it's here
 		jmp jmpBack
 	}
 }
-//extern fo::MessageList* msgWorldmap;
-//fo::MessageList*& msgWorldmap = *reinterpret_cast<fo::MessageList**>(0x672FB0);
 
-int*& msgWorldmap = *reinterpret_cast<int**>(0x672FB0);
 const char* GetWorldmapMsg(int msgId) {
-	//memset(msg, 0, 255);
-	return fo::GetMessageStr((fo::MessageList*)0x672FB0, msgId);
+	return fo::GetMessageStr((fo::MessageList*)MSG_FILE_WORLDMAP, msgId);
 }
 
 void GetCurrentTerrain() {
-	int*& terrainId = *reinterpret_cast<int**>(0x672E14);
+	int*& terrainId = *reinterpret_cast<int**>(FO_VAR_world_subtile);
 	if (terrainId == NULL)
 		currentTerrainStr = "";
 	else
@@ -139,12 +126,17 @@ void WmDrawText(char* text, BYTE colorIndex, DWORD x, DWORD y, DWORD txtWidth) {
 // Called from Interface.cpp
 void sfall::Rotators::OnWmRefresh() {
 	
+	if (!displayTerrainOnHotspot)
+		return;
+
 	auto oldFont = GetFont();
 	GetCurrentTerrain();
 	SetFont(0x65);
 	if (hoveringHotspot == 1 && !IsMovingOnWM()) {
-		WmDrawText((char*)currentTerrainStr, 228, fo::var::world_xpos - fo::var::wmWorldOffsetX, (fo::var::world_ypos - fo::var::wmWorldOffsetY) + 5, 60);  // Shadow
-		WmDrawText((char*)currentTerrainStr, 215, fo::var::world_xpos - fo::var::wmWorldOffsetX - 1, (fo::var::world_ypos - fo::var::wmWorldOffsetY) + 4, 60);
+		auto x = fo::var::world_xpos - fo::var::wmWorldOffsetX;
+		auto y = fo::var::world_ypos - fo::var::wmWorldOffsetY;
+		WmDrawText((char*)currentTerrainStr, terrainOnHotspotShadowColor, x, y + 5, 60);  // Shadow
+		WmDrawText((char*)currentTerrainStr, terrainOnHotspotTextColor, x - 1, y + 4, 60);
 	}
 	
 	SetFont(oldFont);
@@ -153,14 +145,26 @@ void sfall::Rotators::OnWmRefresh() {
 // https://i.imgur.com/0bu4J2l.png
 static void InitTerrainHover()
 {
-	sfall::MakeJump(0x4BFE84, wmDetectHotspotHover);
+	displayTerrainOnHotspot     = sfall::GetConfigInt("Interface", "DisplayTerrainOnHotspotHover", 0, rotatorsIni);
+	terrainOnHotspotTextColor   = sfall::GetConfigInt("Interface", "TerrainOnHotspotTextColor", 215, rotatorsIni);
+	terrainOnHotspotShadowColor = sfall::GetConfigInt("Interface", "TerrainOnHotspotTextShadowColor", 228, rotatorsIni);
+	if(displayTerrainOnHotspot)
+		sfall::MakeJump(0x4BFE84, wmDetectHotspotHover);
 	currentTerrainStr = new char[32];
+}
+
+static void InitTravelDotSettings()
+{
+	sfall::dot_color = sfall::GetConfigInt("Interface", "WorldTravelMarkerColor", 133, rotatorsIni);
+	sfall::spaceLen  = sfall::GetConfigInt("Interface", "WorldTravelMarkerSpaceLen", 2, rotatorsIni);
+	sfall::dotLen    = sfall::GetConfigInt("Interface", "WorldTravelMarkerDotLen", 1, rotatorsIni);
 }
 
 void sfall::Rotators::init()
 {
     InitCustomDll();
     InitTerrainHover();
+	InitTravelDotSettings();
 }
 
 void sfall::Rotators::exit()
