@@ -53,12 +53,11 @@ void __declspec(naked) wmDetectHotspotHover() {
 	bool oldIsMouseOverHotspot;
 	__asm {
 		pushad
+		mov edx, dword ptr ss : [esp + 40]
 		mov ebp, esp
 		sub esp, __LOCAL_SIZE
-		mov eax, dword ptr ss : [esp + 60] // if you declare more variables above, increment this and the below esp offset
-		mov[ebp - 4], eax
-		mov eax, dword ptr ss : [esp + 64]
-		mov[ebp - 8], eax
+		mov wmMouseY, eax
+		mov wmMouseX, edx
 	}
 	oldIsMouseOverHotspot = isMouseOverHotspot;
 	deltaX = abs((long)fo::var::world_xpos - (wmMouseX - 20 + fo::var::wmWorldOffsetX));
