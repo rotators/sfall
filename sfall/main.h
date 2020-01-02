@@ -92,9 +92,6 @@ std::vector<std::string> GetIniList(const char* section, const char* setting, co
 // Gets the integer value from Sfall configuration INI file.
 unsigned int GetConfigInt(const char* section, const char* setting, int defaultValue);
 
-// Gets the integer value from given INI file.
-unsigned int GetConfigInt(const char* section, const char* setting, int defaultValue, const char* iniFile);
-
 // Gets the string value from Sfall configuration INI file with trim function.
 std::string GetConfigString(const char* section, const char* setting, const char* defaultValue, size_t bufSize = 128);
 

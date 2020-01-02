@@ -14,6 +14,7 @@ const char rotatorsIni[] = ".\\ddraw.rotators.ini";
 const char* currentTerrainStr;
 
 // DisplayTerrainOnHotspotHover related variables
+bool isMouseOverHotspot;
 bool displayTerrainOnHotspot;
 BYTE terrainOnHotspotTextColor;
 BYTE terrainOnHotspotShadowColor;
@@ -47,11 +48,10 @@ static void InitCustomDll()
 }
 
 int jmpBack = 0x4BFE89;
-bool hoveringHotspot = false;
 void __declspec(naked) wmDetectHotspotHover() {
 	int wmMouseX, wmMouseY;
 	int deltaX, deltaY;
-	bool hovered;
+	bool oldIsMouseOverHotspot;
 	__asm {
 		pushad
 		mov ebp, esp
@@ -61,12 +61,12 @@ void __declspec(naked) wmDetectHotspotHover() {
 		mov eax, dword ptr ss : [esp + 64]
 		mov[ebp - 8], eax
 	}
-	hovered = hoveringHotspot;
+	oldIsMouseOverHotspot = isMouseOverHotspot;
 	deltaX = abs((long)fo::var::world_xpos - (wmMouseX - 20 + fo::var::wmWorldOffsetX));
 	deltaY = abs((long)fo::var::world_ypos - (wmMouseY - 20 + fo::var::wmWorldOffsetY));
 
-	hoveringHotspot = deltaX < 5 && deltaY < 5;
-	if (hoveringHotspot != hovered)
+	isMouseOverHotspot = deltaX < 5 && deltaY < 5;
+	if (isMouseOverHotspot != oldIsMouseOverHotspot)
 		fo::func::wmInterfaceRefresh();
 
 	__asm {
@@ -132,7 +132,7 @@ void sfall::Rotators::OnWmRefresh() {
 	auto oldFont = GetFont();
 	GetCurrentTerrain();
 	SetFont(0x65);
-	if (hoveringHotspot == 1 && !IsMovingOnWM()) {
+	if (isMouseOverHotspot == 1 && !IsMovingOnWM()) {
 		auto x = fo::var::world_xpos - fo::var::wmWorldOffsetX;
 		auto y = fo::var::world_ypos - fo::var::wmWorldOffsetY;
 		WmDrawText((char*)currentTerrainStr, terrainOnHotspotShadowColor, x, y + 5, 60);  // Shadow
@@ -142,12 +142,16 @@ void sfall::Rotators::OnWmRefresh() {
 	SetFont(oldFont);
 }
 
+static int GetConfigInt(const char* section, const char* setting, int defaultValue) {
+	return sfall::iniGetInt(section, setting, defaultValue, rotatorsIni);
+}
+
 // https://i.imgur.com/0bu4J2l.png
 static void InitTerrainHover()
 {
-	displayTerrainOnHotspot     = sfall::GetConfigInt("Interface", "DisplayTerrainOnHotspotHover", 0, rotatorsIni);
-	terrainOnHotspotTextColor   = sfall::GetConfigInt("Interface", "TerrainOnHotspotTextColor", 215, rotatorsIni);
-	terrainOnHotspotShadowColor = sfall::GetConfigInt("Interface", "TerrainOnHotspotTextShadowColor", 228, rotatorsIni);
+	displayTerrainOnHotspot     = GetConfigInt("Interface", "DisplayTerrainOnHotspotHover", 0);
+	terrainOnHotspotTextColor   = GetConfigInt("Interface", "TerrainOnHotspotTextColor", 215);
+	terrainOnHotspotShadowColor = GetConfigInt("Interface", "TerrainOnHotspotTextShadowColor", 228);
 	if(displayTerrainOnHotspot)
 		sfall::MakeJump(0x4BFE84, wmDetectHotspotHover);
 	currentTerrainStr = new char[32];
@@ -155,9 +159,9 @@ static void InitTerrainHover()
 
 static void InitTravelDotSettings()
 {
-	sfall::dot_color = sfall::GetConfigInt("Interface", "WorldTravelMarkerColor", 133, rotatorsIni);
-	sfall::spaceLen  = sfall::GetConfigInt("Interface", "WorldTravelMarkerSpaceLen", 2, rotatorsIni);
-	sfall::dotLen    = sfall::GetConfigInt("Interface", "WorldTravelMarkerDotLen", 1, rotatorsIni);
+	sfall::dot_color = GetConfigInt("Interface", "WorldTravelMarkerColor", 133);
+	sfall::spaceLen  = GetConfigInt("Interface", "WorldTravelMarkerSpaceLen", 2);
+	sfall::dotLen    = GetConfigInt("Interface", "WorldTravelMarkerDotLen", 1);
 }
 
 void sfall::Rotators::init()
