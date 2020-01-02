@@ -63,7 +63,7 @@ void __declspec(naked) wmDetectHotspotHover() {
 	deltaX = abs((long)fo::var::world_xpos - (wmMouseX - 20 + fo::var::wmWorldOffsetX));
 	deltaY = abs((long)fo::var::world_ypos - (wmMouseY - 20 + fo::var::wmWorldOffsetY));
 
-	isMouseOverHotspot = deltaX < 5 && deltaY < 5;
+	isMouseOverHotspot = deltaX < 8 && deltaY < 5;
 	if (isMouseOverHotspot != oldIsMouseOverHotspot)
 		fo::func::wmInterfaceRefresh();
 
