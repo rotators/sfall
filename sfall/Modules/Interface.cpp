@@ -526,8 +526,6 @@ static void __declspec(naked) DrawingDots() {
 		// TODO: fix dots for car travel
 	}
 
-	Rotators::OnWmRefresh();
-
 	__asm {
 		mov esp, ebp; // epilog
 		retn;
@@ -545,6 +543,7 @@ static void __declspec(naked) wmInterfaceRefresh_hook() {
 			spaceLen = optionSpaceDot;
 		}
 	}
+	Rotators::OnWmRefresh();
 	__asm jmp fo::funcoffs::wmDrawCursorStopped_;
 }
 
