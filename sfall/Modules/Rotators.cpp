@@ -88,6 +88,11 @@ const char* GetWorldmapMsg(int msgId) {
 	return fo::GetMessageStr((fo::MessageList*)MSG_FILE_WORLDMAP, msgId);
 }
 
+// player is on a green circle.
+bool IsOnLocation() {
+	return fo::var::WorldMapCurrArea != -1;
+}
+
 void GetCurrentTerrain() {
 	int*& terrainId = *reinterpret_cast<int**>(FO_VAR_world_subtile);
 	if (terrainId == NULL)
@@ -139,7 +144,7 @@ void sfall::Rotators::OnWmRefresh() {
 	auto oldFont = GetFont();
 	GetCurrentTerrain();
 	SetFont(0x65);
-	if (isMouseOverHotspot == 1 && !IsMovingOnWM()) {
+	if (isMouseOverHotspot == 1 && !IsMovingOnWM() && !IsOnLocation()) {
 		auto x = fo::var::world_xpos - fo::var::wmWorldOffsetX;
 		auto y = fo::var::world_ypos - fo::var::wmWorldOffsetY;
 		WmDrawText((char*)currentTerrainStr, terrainOnHotspotShadowColor, x, y + 5, 60);  // Shadow
@@ -161,21 +166,13 @@ static void InitTerrainHover()
 	terrainOnHotspotShadowColor = GetConfigInt("Interface", "TerrainOnHotspotTextShadowColor", 228);
 	if(displayTerrainOnHotspot)
 		sfall::MakeJump(0x4BFE84, wmDetectHotspotHover);
-	currentTerrainStr = new char[32];
-}
-
-static void InitTravelDotSettings()
-{
-	sfall::dot_color = GetConfigInt("Interface", "WorldTravelMarkerColor", 133);
-	sfall::spaceLen  = GetConfigInt("Interface", "WorldTravelMarkerSpaceLen", 2);
-	sfall::dotLen    = GetConfigInt("Interface", "WorldTravelMarkerDotLen", 1);
+	currentTerrainStr = "";
 }
 
 void sfall::Rotators::init()
 {
     InitCustomDll();
     InitTerrainHover();
-	InitTravelDotSettings();
 	#ifdef HTTPD_SERVER
 	  thread = std::thread(InitHTTPD);
 	#endif
