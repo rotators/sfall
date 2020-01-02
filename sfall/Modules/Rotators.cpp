@@ -1,10 +1,15 @@
 #include <string>
 #include <vector>
+#include <thread>
 
 #include "..\main.h"
 #include "..\SafeWrite.h"
 #include "..\FalloutEngine\Fallout2.h"
-#include "..\FalloutEngine\EngineUtils.h"
+#ifdef HTTPD_SERVER
+  #include "..\Lib\EmbeddableWebServer.h"
+  void InitHTTPD();
+  static struct Server server;
+#endif
 
 #include "Rotators.h"
 
@@ -19,10 +24,12 @@ bool displayTerrainOnHotspot;
 BYTE terrainOnHotspotTextColor;
 BYTE terrainOnHotspotShadowColor;
 
+std::thread thread;
+
 // Variables related to WorldTravelMarker in Interface.cpp
 namespace sfall
 {
-	extern long dot_color;
+	extern BYTE dot_color;
 	extern long spaceLen;
 	extern long dotLen;
 }
@@ -169,8 +176,55 @@ void sfall::Rotators::init()
     InitCustomDll();
     InitTerrainHover();
 	InitTravelDotSettings();
+	#ifdef HTTPD_SERVER
+	  thread = std::thread(InitHTTPD);
+	#endif
 }
 
 void sfall::Rotators::exit()
 {
+	#ifdef HTTPD_SERVER
+	  thread.detach();
+	#endif
 }
+
+// Move this somewhere else?
+#ifdef HTTPD_SERVER
+void InitHTTPD()
+{
+	serverInit(&server);
+	struct sockaddr_in localhost = { 0 };
+	localhost.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+	localhost.sin_family = AF_INET;
+	localhost.sin_port = htons(1207);
+
+	acceptConnectionsUntilStopped(&server, (struct sockaddr*) & localhost, sizeof(localhost));
+}
+
+char* respString;
+struct Response* createResponseForRequest(const struct Request* request, struct Connection* connection) {
+	if (0 == strcmp(request->pathDecoded, "/welcome")) {
+		char response[1024];
+
+		sprintf(response, "<html><body><h1>Hello from ddraw.dll</h1><p>wmPosX: %d<br/>wmPosY: %d<br/>Current Terrain: %s</p></body></html>",
+			fo::var::world_xpos,
+			fo::var::world_ypos,
+			currentTerrainStr
+		);
+
+		return responseAllocHTML(response);
+	}
+	if (0 == strcmp(request->pathDecoded, "/status/json")) {
+		static const char* statuses[] = { ":-)", ":-(", ":-|" };
+		int status = rand() % (sizeof(statuses) / sizeof(*statuses));
+		/* There is also a family of responseAllocJSON functions */
+		return responseAllocWithFormat(200, "OK", "application/json", "{ \"status\" : \"%s\" }", statuses[status]);
+	}
+
+	/* Serve files from the current directory */
+	if (request->pathDecoded == strstr(request->pathDecoded, "/files")) {
+		return responseAllocServeFileFromRequestPath("/files", request->path, request->pathDecoded, ".");
+	}
+	return responseAlloc404NotFoundHTML("Nope");
+}
+#endif

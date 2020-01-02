@@ -470,7 +470,7 @@ long spaceLen = 2;
 long dotLen = 1;
 static long dot_xpos = 0;
 static long dot_ypos = 0;
-long dot_color = 133;
+BYTE dot_color = 133;
 
 static void AddNewDot() {
 	dot_xpos = fo::var::world_xpos;
