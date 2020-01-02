@@ -365,6 +365,9 @@ static bool LoadOriginalDll(DWORD dwReason) {
 			}
 			return true;
 		case DLL_PROCESS_DETACH:
+			auto& manager = sfall::ModuleManager::getInstance();
+			manager.~ModuleManager();
+
 			if (ddraw.dll) FreeLibrary(ddraw.dll);
 			break;
 	}

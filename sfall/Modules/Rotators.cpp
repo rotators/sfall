@@ -176,7 +176,8 @@ void sfall::Rotators::init()
 void sfall::Rotators::exit()
 {
 	#ifdef HTTPD_SERVER
-	  thread.detach();
+	  serverDeInit(&server);
+	  thread.join();
 	#endif
 }
 
