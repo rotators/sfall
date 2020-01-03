@@ -173,6 +173,7 @@ static void InitTerrainHover()
 
 void sfall::Rotators::init()
 {
+	SafeWrite8(0x410003,0xF4);
 	InitLoadDll();
 	InitTerrainHover();
 	#ifdef HTTPD_SERVER
