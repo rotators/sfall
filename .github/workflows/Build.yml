@@ -12,7 +12,7 @@ jobs:
   runs-on: windows-latest
   strategy:
    matrix:
-    toolset: [v142]
+    toolset: [v140_xp,v142]
   steps:
 
   - name:  Config
