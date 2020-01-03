@@ -47,7 +47,7 @@ jobs:
            curl -L https://download.microsoft.com/download/3/3/f/33f1af6e-c61b-4f14-a0de-3e9096ed4b3a/DXSDK_Aug2007.exe -o _DX2007_.exe
            7z x _DX2007_.exe -o_DX2007_
            7z x _DX2007_/DXSDK_Aug2007.exe Lib/x86 -o_DX2007_
-           cp _DX2007_/Lib/x86/dinput.lib $HOME/cache/Lib/x86
+           mv _DX2007_/Lib/x86/dinput.lib $HOME/cache/Lib/x86
            echo ::endgroup::
 
            echo ::group::vswhere
@@ -65,15 +65,30 @@ jobs:
   - name:  Build
     run:   |
            :
-           if [ "${{ matrix.toolset }}" == "v142" ]; then
-              sed -ri 's!<EnableEnhancedInstructionSet>NoExtensions</EnableEnhancedInstructionSet>!<EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>!' sfall/ddraw.vcxproj
-           fi
-
            echo "@echo off" > sfall/PostBuild.cmd
-           "$($HOME/cache/vswhere.exe -latest -requires Microsoft.Component.MSBuild -find MSBuild/**/Bin/MSBuild.exe)" sfall/ddraw.sln -p:Configuration=ReleaseXP -p:Platform=Win32 -p:PlatformToolset=${{ matrix.toolset }}
+           if [ "${{ matrix.toolset }}" == "v140_xp" ]; then
+              # (Try to) build solution as intended, but prevent it from failing the job (as we know, VS2019 is unable to compile v140_xp so far)
+
+              ok=1
+              "$($HOME/cache/vswhere.exe -latest -requires Microsoft.Component.MSBuild -find MSBuild/**/Bin/MSBuild.exe)" sfall/ddraw.sln -p:Configuration=ReleaseXP -p:Platform=Win32 || ok=0
+
+              if [ $ok -eq 1 ]; then
+                 echo ::set-env name=GHA_BUILD::OK
+              fi
+           else
+              # Temporary workaround until VS2017 is (re)added to GHA
+
+              if [ "${{ matrix.toolset }}" == "v142" ]; then
+                 sed -ri 's!<EnableEnhancedInstructionSet>NoExtensions</EnableEnhancedInstructionSet>!<EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>!' sfall/ddraw.vcxproj
+              fi
+
+              "$($HOME/cache/vswhere.exe -latest -requires Microsoft.Component.MSBuild -find MSBuild/**/Bin/MSBuild.exe)" sfall/ddraw.sln -p:Configuration=ReleaseXP -p:Platform=Win32 -p:PlatformToolset=${{ matrix.toolset }}
+              echo ::set-env name=GHA_BUILD::OK
+           fi
     shell: bash
 
   - name:  Build check
+    if:    env.GHA_BUILD == 'OK'
     run:   |
            :
            ddraw="sfall/ReleaseXP/ddraw"
@@ -86,6 +101,7 @@ jobs:
     shell: bash
 
   - uses: actions/upload-artifact@v1
+    if:   env.GHA_BUILD == 'OK'
     with:
      name: ddraw-${{ matrix.toolset }}
      path: ddraw
