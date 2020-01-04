@@ -5,6 +5,8 @@
 #include "..\SafeWrite.h"
 #include "..\FalloutEngine\Fallout2.h"
 
+#include "ScriptExtender.h"
+
 #ifdef HTTPD_SERVER
 	#include <thread>
 	#include "..\Lib\EmbeddableWebServer.h"
@@ -18,7 +20,16 @@
 
 // Remember to wear protective goggles :)
 
-const char rotatorsIni[] = ".\\ddraw.rotators.ini";
+namespace sfall
+{
+	namespace script
+	{
+		// Calls vec.reserve(100) before work
+		// Goes through all elevations (!) and tiles (!!!)
+		void FillListVector(DWORD type, std::vector<fo::GameObject*>& vec);
+	}
+}
+
 const char* currentTerrainStr;
 
 // DisplayTerrainOnHotspotHover related variables
@@ -29,7 +40,11 @@ BYTE terrainOnHotspotShadowColor;
 
 // Any and all configuration should be read from ddraw.rotators.ini; /artifacts/ddraw.rotators.ini should be updated to reflect code, when possible;
 // adds some extra work on PR/merge, but pays off in a long run
-/*static*/ struct Ini {
+/*static*/ class Ini {
+private:
+	static constexpr char rotatorsIni[] = ".\\ddraw.rotators.ini";
+
+public:
 	static std::string String(const char* section, const char* setting, const char* defaultValue) {
 		return sfall::GetIniString(section, setting, defaultValue, 512, rotatorsIni);
 	}
@@ -213,6 +228,9 @@ bool DoesFileExist(const char* filename) {
 
 char* respString;
 struct Response* createResponseForRequest(const struct Request* request, struct Connection* connection) {
+	// RESERVED
+	// /db/*
+
 	if (0 == strcmp(request->pathDecoded, "/")
 		|| 0 == strcmp(request->pathDecoded, "/style.css")
 		|| 0 == strcmp(request->pathDecoded, "/script.js")) {
@@ -223,6 +241,36 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
 		int status = rand() % (sizeof(statuses) / sizeof(*statuses));
 		/* There is also a family of responseAllocJSON functions */
 		return responseAllocWithFormat(200, "OK", "application/json", "{ \"status\" : \"%s\" }", statuses[status]);
+	}
+	if (0 == strcmp(request->pathDecoded, "/dump/game-objects")) {
+		std::vector<fo::GameObject*> vec;
+		sfall::script::FillListVector(static_cast<DWORD>(FLV::ALL), vec);
+
+		std::string response = "<html><body>\n";
+		for (const auto& obj : vec) {
+			response += " id=" + std::to_string(obj->id);
+			response += " protoId=" + std::to_string(obj->protoId);
+
+			response += " scriptId=" + std::to_string(obj->scriptId) + "=";
+			fo::ScriptInstance* script;
+			if (fo::func::scr_ptr(obj->scriptId, &script) != -1 && script->program != nullptr)
+				response += std::string(script->program->fileName);
+			else
+				response += "nullptr";
+
+			response += " x=" + std::to_string(obj->x);
+			response += " y=" + std::to_string(obj->y);
+			response += " sx=" + std::to_string(obj->sx);
+			response += " sy=" + std::to_string(obj->sy);
+			response += " rotation=" + std::to_string(obj->rotation);
+			response += " frm=" + std::to_string(obj->frm);
+			response += " artFid=" + std::to_string(obj->artFid);
+
+			response += "<br/>\n";
+		}
+		response += "</body></html>\n";
+
+		return responseAllocHTML(response.c_str());
 	}
 
 	/* Serve files from the current directory */

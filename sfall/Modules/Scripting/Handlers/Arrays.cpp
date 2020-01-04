@@ -150,7 +150,7 @@ struct ListId {
 };
 static std::vector<ListId> mList;
 
-static void FillListVector(DWORD type, std::vector<fo::GameObject*>& vec) {
+/*upstream:static*/ void FillListVector(DWORD type, std::vector<fo::GameObject*>& vec) {
 	vec.reserve(100);
 	if (type == 6) {
 		fo::ScriptInstance* scriptPtr;
