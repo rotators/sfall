@@ -456,15 +456,6 @@ static void _declspec(naked) _xenum_files()
 	}
 }
 
-static void _memzero(void* buffer, int _size)
-{
-	__asm {
-		mov eax, buffer
-		mov ebx, _size
-		mov edx, 0
-	}
-}
-
 static void* db_readfile(char* filename, int len)
 {
 	auto buffer = malloc(len);
@@ -489,7 +480,6 @@ static int db_filelen(int dbFile) {
 static void* xenum_files(char* searchstring)
 {
 	void* result = malloc(12);
-	_memzero(result, 12);
 	__asm {
 		mov eax, searchstring
 		mov ecx, result
@@ -582,18 +572,8 @@ int mapIdToLoad = 0;
 static void loadmap() {
 	__asm {
 		pushad
-		//mov eax, 0xdfd04
-		//mov edx, 0
-		//mov ebx, 1
-		//call fo::funcoffs::map_leave_map_
-		//xor ebx, ebx
-		//xor esi, esi
-		//xor ecx, ecx
 		mov eax, [mapIdToLoad]
 		call fo::funcoffs::map_load_idx_
-		//mov ds:[FO_VAR_map_number], 1
-		//mov eax, toLoad
-		//call fo::funcoffs::map_load_
 		popad
 	}
 }
@@ -625,8 +605,6 @@ void sfall::Rotators::init()
 	xfopenLoadedFrom = (char*)malloc(200);
 	sfall::MakeCall(0x4DEFCD, xfopen_hook);
 	sfall::MainLoopHook::OnMainLoop() += OnMainLoop;
-	//mapToLoad = (char*)malloc(32);
-	//sprintf(mapToLoad, "");
 	//sfall::MakeCall(0x4DFF33, _xenum_files);
 	//sfall::MakeJump(0x480A23, LoadScreenInitHook);
 	#ifdef HTTPD_SERVER
@@ -717,14 +695,6 @@ Response* HTMLDisplayDBFiles(char* pattern) {
 }
 
 Response* HTMLDisplayMaps() {
-	//char** filenames;
-	//int count = fo::func::db_get_file_list("maps\\*.map", &filenames);
-	//std::string response = std::string(HTMLStart);
-	/*for (auto i = 0; i < count; i++) {
-		char buf[128];
-		sprintf(buf, "<a href='/loadmap/%s'>%s</a><br/>\n", filenames[i], filenames[i]);
-		response += buf;
-	}*/
 	auto mapBase = fo::var::wmMapInfoList;
 	std::string response = std::string(HTMLStart);
 	for (int i = 0; i < fo::var::wmMaxMapNum; i++) {
@@ -734,7 +704,6 @@ Response* HTMLDisplayMaps() {
 		response += buf;
 	}
 	response += HTMLEnd;
-	//fo::func::db_free_file_list(&filenames, 0);
 	response += HTMLEnd;
 	return responseAllocHTML(response.c_str());
 }
@@ -753,13 +722,8 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
 	if (0 == strncmp(request->pathDecoded, "/loadmap/", 9)) {
 		std::vector<std::string> spl = sfall::split(std::string(request->pathDecoded), '/');
 		char* cstr = (char*)malloc(32);
-		//sprintf(cstr, "%s", );
 		int id = strtol(spl[2].c_str(), NULL, 10);
 		mapIdToLoad = id;
-		//char* withExt = (char*)malloc(32);
-		//transform(spl[2].begin(), spl[2].end(), spl[2].begin(), ::tolower);
-		//sprintf(matched, "%s", spl[2].c_str());
-		
 		return HTMLDisplayMaps();
 	}
 	if (0 == strcmp(request->pathDecoded, "/files/scripts")) {	return HTMLDisplayDBFiles("scripts\\*.int"); }
