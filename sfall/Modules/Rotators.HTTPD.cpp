@@ -1,8 +1,7 @@
-#ifdef HTTPD_SERVER // why do we need that, again?
-
 #include <cstdint>
 #include <string>
 #include <thread>
+#include <map>
 
 #include "..\FalloutEngine\Fallout2.h"
 #include "..\SafeWrite.h"
@@ -60,6 +59,15 @@ char* HTMLEnd = R"HTML_S(</body></html>)HTML_S";
 //
 
 
+static void loadmap() {
+	__asm {
+		pushad
+		mov eax, [mapIdToLoad]
+		call fo::funcoffs::map_load_idx_
+		popad
+	}
+}
+
 void hasKey(char* key)
 {
 	alreadyHasKey = false;
@@ -71,15 +79,6 @@ void hasKey(char* key)
 		}
 	}
 	return;
-}
-
-static void loadmap() {
-	__asm {
-		pushad
-		mov eax, [mapIdToLoad]
-		call fo::funcoffs::map_load_idx_
-		popad
-	}
 }
 
 static __declspec(naked) void xfopen_hook() {
@@ -115,7 +114,21 @@ static void OnMainLoop() {
 	}
 }
 
-//
+enum MapsEntryFlags : BYTE {
+	IsSavable= 0x1,
+	DeadBodiesAge = 0x2,
+};
+
+// Maps.txt info
+// 0x4BFA05 & 4BFA18
+// 0x4BFA81 (how flags are handled)
+struct WMMapInfo {
+	char lookupName[0x30];
+	char mapName[0x28];
+	char music[0x28];
+	MapsEntryFlags mapsFlags;
+	char pad[(0x248 - 0x28 - 0x28 - 0x30 - 0x01)]; // rest is unclear for now.
+};
 
 bool DoesFileExist(const char* filename) {
 	struct stat st;
@@ -142,10 +155,12 @@ Response* HTMLDisplayDBFiles(char* pattern) {
 Response* HTMLDisplayMaps() {
 	auto mapBase = fo::var::wmMapInfoList;
 	std::string response = std::string(HTMLStart);
+	response += "<p>These are all from Maps.txt</p>";
+	auto mapsInfo = *(WMMapInfo(*)[])((*(DWORD*)(FO_VAR_wmMapInfoList)));
 	for (int i = 0; i < fo::var::wmMaxMapNum; i++) {
-		char* name = reinterpret_cast<char*>(mapBase + (i * 0x248) + 0x30); // 0x4BFA05 & 4BFA18
 		char buf[128];
-		sprintf(buf, "<a href='/loadmap/%d'>%s.map</a><br/>\n", i, name);
+		WMMapInfo map = mapsInfo[i];
+		sprintf(buf, "<a href='/loadmap/%d'>%s.map (music=%s)</a><br/>\n", i, map.mapName, map.music);
 		response += buf;
 	}
 
@@ -282,7 +297,3 @@ void sfall::HTTPD::exit() {
 		thread.join();
 	}
 }
-
-
-#endif // HTTPD_SERVER //
-
