@@ -242,6 +242,7 @@
 #define FO_VAR_wmBkWinBuf                 0x51DE24
 #define FO_VAR_wmLastRndTime              0x51DEA0
 #define FO_VAR_wmMaxMapNum                0x51DE10
+#define FO_VAR_wmMapInfoList              0x51DE0C
 #define FO_VAR_wmMaxTileNum               0x51DDF0
 #define FO_VAR_wmNumHorizontalTiles       0x51DDF4
 #define FO_VAR_wmViewportRightScrlLimit   0x672EFC

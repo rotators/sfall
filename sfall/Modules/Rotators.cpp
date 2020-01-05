@@ -1,8 +1,10 @@
 #include <string>
 #include <vector>
+#include <map>
 
 #include "..\main.h"
 #include "..\SafeWrite.h"
+#include "..\Utils.h"
 #include "..\FalloutEngine\Fallout2.h"
 #include "MainLoopHook.h"
 #include "FileSystem.h"
@@ -529,6 +531,80 @@ int autoLoadAfter = 0x47CAE5;
 }*/
 
 
+
+char* xfopenLoadFile;
+char* xfopenLoadedFrom;
+char* xf1;
+char* xf2;
+int _rewind = 0x004F1411;
+std::map<char*, char*> xfopened;
+
+bool alreadyHasKey = false;
+
+void hasKey(char* key)
+{
+	alreadyHasKey = false;
+	for (auto const& x : xfopened)
+	{
+		if (strcmp(x.first, key) == 0) {
+			alreadyHasKey = true;
+			return;
+		}
+	}
+	return;
+}
+
+static __declspec(naked) void xfopen_hook() {
+	__asm {
+		pushad
+		mov xfopenLoadFile, edi
+		mov eax, dword ptr ss : [ecx]
+		mov xfopenLoadedFrom, eax
+
+	}
+	hasKey(xfopenLoadFile);
+	if (!alreadyHasKey) {
+		xf1 = (char*)malloc(200);
+		xf2 = (char*)malloc(200);
+		memmove(xf1, xfopenLoadFile, 200);
+		memmove(xf2, xfopenLoadedFrom, 200);
+		xfopenLoadFile = "";
+		xfopenLoadedFrom = "";
+		xfopened[xf1] = xf2;
+	}
+	__asm {
+		popad
+		jmp _rewind
+	}
+}
+
+int mapIdToLoad = 0;
+static void loadmap() {
+	__asm {
+		pushad
+		//mov eax, 0xdfd04
+		//mov edx, 0
+		//mov ebx, 1
+		//call fo::funcoffs::map_leave_map_
+		//xor ebx, ebx
+		//xor esi, esi
+		//xor ecx, ecx
+		mov eax, [mapIdToLoad]
+		call fo::funcoffs::map_load_idx_
+		//mov ds:[FO_VAR_map_number], 1
+		//mov eax, toLoad
+		//call fo::funcoffs::map_load_
+		popad
+	}
+}
+
+static void OnMainLoop() {
+	if (mapIdToLoad != 0) {
+		loadmap();
+		mapIdToLoad = 0;
+	}
+}
+
 // https://i.imgur.com/0bu4J2l.png
 static void InitTerrainHover()
 {
@@ -545,6 +621,12 @@ void sfall::Rotators::init()
 	SafeWrite8(0x410003,0xF4);
 	InitLoadDll();
 	InitTerrainHover();
+	xfopenLoadFile = (char*)malloc(200);
+	xfopenLoadedFrom = (char*)malloc(200);
+	sfall::MakeCall(0x4DEFCD, xfopen_hook);
+	sfall::MainLoopHook::OnMainLoop() += OnMainLoop;
+	//mapToLoad = (char*)malloc(32);
+	//sprintf(mapToLoad, "");
 	//sfall::MakeCall(0x4DFF33, _xenum_files);
 	//sfall::MakeJump(0x480A23, LoadScreenInitHook);
 	#ifdef HTTPD_SERVER
@@ -579,7 +661,7 @@ static void* db_fastread(char* filename)
 			mov eax, filename
 			mov edx, buffer
 			call fo::funcoffs::db_read_to_buf_
-		}
+		}	
 
 		fo::func::db_fclose(file);
 		return buffer;
@@ -629,6 +711,30 @@ Response* HTMLDisplayDBFiles(char* pattern) {
 		response += filenames[i];
 		response += "<br/>\n";
 	}
+	fo::func::db_free_file_list(&filenames, 0);
+	response += HTMLEnd;
+	return responseAllocHTML(response.c_str());
+}
+
+Response* HTMLDisplayMaps() {
+	//char** filenames;
+	//int count = fo::func::db_get_file_list("maps\\*.map", &filenames);
+	//std::string response = std::string(HTMLStart);
+	/*for (auto i = 0; i < count; i++) {
+		char buf[128];
+		sprintf(buf, "<a href='/loadmap/%s'>%s</a><br/>\n", filenames[i], filenames[i]);
+		response += buf;
+	}*/
+	auto mapBase = fo::var::wmMapInfoList;
+	std::string response = std::string(HTMLStart);
+	for (int i = 0; i < fo::var::wmMaxMapNum; i++) {
+		char* name = reinterpret_cast<char*>(mapBase + (i * 0x248) + 0x30); // 0x4BFA05 & 4BFA18
+		char buf[128];
+		sprintf(buf, "<a href='/loadmap/%d'>%s.map</a><br/>\n", i, name);
+		response += buf;
+	}
+	response += HTMLEnd;
+	//fo::func::db_free_file_list(&filenames, 0);
 	response += HTMLEnd;
 	return responseAllocHTML(response.c_str());
 }
@@ -644,8 +750,42 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
 		return responseAllocServeFileFromRequestPath("/", request->path, request->pathDecoded, DocumentRoot.c_str());
 	}
 
+	if (0 == strncmp(request->pathDecoded, "/loadmap/", 9)) {
+		std::vector<std::string> spl = sfall::split(std::string(request->pathDecoded), '/');
+		char* cstr = (char*)malloc(32);
+		//sprintf(cstr, "%s", );
+		int id = strtol(spl[2].c_str(), NULL, 10);
+		mapIdToLoad = id;
+		//char* withExt = (char*)malloc(32);
+		//transform(spl[2].begin(), spl[2].end(), spl[2].begin(), ::tolower);
+		//sprintf(matched, "%s", spl[2].c_str());
+		
+		return HTMLDisplayMaps();
+	}
 	if (0 == strcmp(request->pathDecoded, "/files/scripts")) {	return HTMLDisplayDBFiles("scripts\\*.int"); }
-	if (0 == strcmp(request->pathDecoded, "/files/maps")) { return HTMLDisplayDBFiles("maps\\*.map"); }
+	if (0 == strcmp(request->pathDecoded, "/files/maps")) {
+		return HTMLDisplayMaps();
+	}
+
+	if (0 == strcmp(request->pathDecoded, "/files/xfopen")) {
+		std::string response = std::string(HTMLStart);
+		response += "<p>These are all the files loaded via the xfopen function.</p>";
+		response += "<table style='width: 400px;'><thead><tr><th>File</th><th>Source</th></thead><tbody>";
+		for (auto const& x : xfopened)
+		{
+			response += "<tr>";
+			response += "<td>";
+			response += x.first;
+			response += "</td>";
+			response += "<td>";
+			response += x.second;
+			response += "</td>";
+			response += "</tr>\n";
+		}
+		response += "</tbody></table>";
+		response += HTMLEnd;
+		return responseAllocHTML(response.c_str());
+	}
 
 	if (0 == strcmp(request->pathDecoded, "/dump/game-objects")) {
 		std::vector<fo::GameObject*> vec;
