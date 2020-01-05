@@ -33,6 +33,7 @@ namespace sfall
 	}
 }
 
+const char  rotatorsIni[] = ".\\ddraw.rotators.ini";
 const char* currentTerrainStr;
 
 // DisplayTerrainOnHotspotHover related variables
@@ -43,11 +44,7 @@ BYTE terrainOnHotspotShadowColor;
 
 // Any and all configuration should be read from ddraw.rotators.ini; /artifacts/ddraw.rotators.ini should be updated to reflect code, when possible;
 // adds some extra work on PR/merge, but pays off in a long run
-/*static*/ class Ini {
-private:
-	static constexpr char rotatorsIni[] = ".\\ddraw.rotators.ini";
-
-public:
+/*static*/ struct Ini {
 	static std::string String(const char* section, const char* setting, const char* defaultValue) {
 		return sfall::GetIniString(section, setting, defaultValue, 512, rotatorsIni);
 	}
