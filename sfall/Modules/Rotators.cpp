@@ -210,10 +210,6 @@ void sfall::Rotators::OnWmRefresh() {
 	SetFont(oldFont);
 }
 
-
-
-
-
 extern void* LoadGameHookFuncAddress;
 int LoadScreenInit = 0x480AF5;
 static void MainHook() { }
@@ -261,7 +257,7 @@ void sfall::Rotators::init()
 
 	SubModules.add<HTTPD>();
 	SubModules.add<LoadDll>();
-	SubModules.add<Sandbox>();
+	//SubModules.add<Sandbox>();
 
 	SubModules.initAll();
 

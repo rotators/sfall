@@ -307,7 +307,7 @@ namespace sfall
 	}
 
 	void Sandbox::init() { 
-		//sfall::MakeCall(0x4DFF33, _xenum_files);
+		sfall::MakeCall(0x4DFF33, _xenum_files);
 		//sfall::MakeJump(0x480A23, LoadScreenInitHook);
 	}
 
