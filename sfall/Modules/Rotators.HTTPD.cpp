@@ -8,6 +8,7 @@
 #include "..\Utils.h"
 
 #include "MainLoopHook.h"
+#include "WorldMap.h"
 
 #include "..\Lib\EmbeddableWebServer.h"
 
@@ -56,9 +57,6 @@ char* HTMLStart = R"HTML_S(<!DOCTYPE html>
 
 char* HTMLEnd = R"HTML_S(</body></html>)HTML_S";
 
-//
-
-
 static void loadmap() {
 	__asm {
 		pushad
@@ -105,14 +103,29 @@ static __declspec(naked) void xfopen_hook() {
 	}
 }
 
-//
 
+
+
+// Thread safe way to manipulate the game
+// avoids trashing the game thread from the HTTPD thread
 static void OnMainLoop() {
 	if (mapIdToLoad != 0) {
 		loadmap();
 		mapIdToLoad = 0;
 	}
 }
+
+/*static void ProcessCommonCommands() {
+
+}*/
+
+/*static void OnWMLoop() {
+	ProcessCommonCommands();
+}
+
+static void OnCombatLoop() {
+	ProcessCommonCommands();
+}*/
 
 enum MapsEntryFlags : BYTE {
 	IsSavable= 0x1,
@@ -257,33 +270,40 @@ Response* HTMLDisplayMaps() {
 }
 
 
+// Some route templating would be a better idea, this is just a short term sanity saver
+#define IS_URL(__path) 0 == strcmp(request->pathDecoded, __path)
+#define DOC_ROOT responseAllocServeFileFromRequestPath("/", request->path, request->pathDecoded, DocumentRoot.c_str())
+#define DOC_INDEX responseAllocServeFileFromRequestPath("/", "/index.html", "/index.html", DocumentRoot.c_str())
 
 // needs better url handling ASAP
 struct Response* createResponseForRequest(const struct Request* request, struct Connection* connection) {
 	// RESERVED
 	// /db/*
 
-	if (0 == strcmp(request->pathDecoded, "/")
-		|| 0 == strcmp(request->pathDecoded, "/style.css")
-		|| 0 == strcmp(request->pathDecoded, "/script.js")) {
-		return responseAllocServeFileFromRequestPath("/", request->path, request->pathDecoded, DocumentRoot.c_str());
+	if (IS_URL("/") || IS_URL("/style.css")|| IS_URL("/script.js")) {
+		return DOC_ROOT;
 	}
 
 	if (0 == strncmp(request->pathDecoded, "/loadmap/", 9)) {
-		std::vector<std::string> spl = sfall::split(std::string(request->pathDecoded), '/');
-		char* cstr = (char*)malloc(32);
-		int id = strtol(spl[2].c_str(), NULL, 10);
-		mapIdToLoad = id;
+		auto spl = sfall::split(std::string(request->pathDecoded), '/');
+		if (spl.size() == 3) {
+			mapIdToLoad = std::stoi(spl[2]);
+		}
 		return HTMLDisplayMaps();
 	}
 
-	if (0 == strcmp(request->pathDecoded, "/files/scripts"))
+	if (IS_URL("/files/scripts"))
 		return HTMLDisplayDBFiles("scripts\\*.int");
 
-	if (0 == strcmp(request->pathDecoded, "/files/maps"))
+	if (IS_URL("/files/maps"))
 		return HTMLDisplayMaps();
 
-	if (0 == strcmp(request->pathDecoded, "/files/xfopen")) {
+	if (IS_URL("/cheats/give-xp")) {
+		fo::func::stat_pc_add_experience(10000);
+		return DOC_INDEX;
+	}
+
+	if (IS_URL("/files/xfopen")) {
 		std::string response = std::string(HTMLStart);
 		response += "<p>These are all the files loaded via the xfopen function.</p>";
 		std::vector<char*> keys;
@@ -307,16 +327,16 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
 		return responseAllocHTML(response.c_str());
 	}
 
-	if (0 == strcmp(request->pathDecoded, "/dump/game-objects")) {
+	if (IS_URL("/dump/game-objects")) {
 		std::vector<fo::GameObject*> vec;
 		sfall::script::FillListVector(static_cast<DWORD>(FLV::ALL), vec);
 
 		std::string response = std::string(HTMLStart);
 
 		auto table = new HTMLTable<fo::GameObject*>();
-		table->width = 800;
+		table->width = 1200;
 		table->rowObjects = vec;
-		table->headers = { "Id", "protoId", "scriptId", "scriptData", "x", "y", "sx", "sy", "rotation", "frm", "artFid" };
+		table->headers = { "Id", "protoId", "scriptId", "scriptData", "x", "y", "sx", "sy", "rotation", "frm", "artFid", "artName" };
 		table->bodyFunc = [](fo::GameObject* obj, int idx) -> std::string {
 			auto tr = std::string("");
 			tr += "<tr>";
@@ -349,6 +369,7 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
 			tr += HTMLTable<void*>::renderCell(std::to_string(obj->rotation));
 			tr += HTMLTable<void*>::renderCell(std::to_string(obj->frm));
 			tr += HTMLTable<void*>::renderCell(std::to_string(obj->artFid));
+			tr += HTMLTable<void*>::renderCell(std::string(fo::func::art_get_name(obj->artFid)));
 			tr += "</tr>\n";
 			return tr;
 		};
@@ -356,11 +377,6 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
 		response += HTMLEnd;
 
 		return responseAllocHTML(response.c_str());
-	}
-
-	/* Serve files from the current directory */
-	if (request->pathDecoded == strstr(request->pathDecoded, "/files")) {
-		return responseAllocServeFileFromRequestPath("/files", request->path, request->pathDecoded, ".");
 	}
 	return responseAlloc404NotFoundHTML("You don't see anything out of the ordinary.");
 }
@@ -377,10 +393,14 @@ static void Run() {
 	localhost.sin_family = AF_INET;
 	localhost.sin_port = htons(sfall::HTTPD::Port); // maybe pass it as argument?
 
-	xfopenLoadFile = (char*)malloc(200);
+	xfopenLoadFile   = (char*)malloc(200);
 	xfopenLoadedFrom = (char*)malloc(200);
 	sfall::MakeCall(0x4DEFCD, xfopen_hook);
 	sfall::MainLoopHook::OnMainLoop() += OnMainLoop;
+	// Switching map in Combat crashes the game and from WM it doesn't work, 
+	// likely needs the use the "enter map from wm" function instead.
+	//sfall::MainLoopHook::OnCombatLoop() += OnCombatLoop;
+	//sfall::Worldmap::OnWorldmapLoop() += OnWMLoop;
 
 	acceptConnectionsUntilStopped(&server, (struct sockaddr*) & localhost, sizeof(localhost));
 }
