@@ -136,6 +136,80 @@ bool DoesFileExist(const char* filename) {
 	return result == 0;
 }
 
+template<typename T>
+class HTMLTable {
+	public:
+		int width=0;
+		std::vector<T> rowObjects;
+		std::vector<std::string> headers;
+		std::function<std::string(T, int)> bodyFunc;
+
+	std::string renderHeader() {
+		std::string buf("");
+		buf += "<thead><tr>";
+		for (auto const& h : headers)
+		{
+			buf += "<th>";
+			buf += h;
+			buf += "</th>";
+		}
+		buf += "</tr></thead>";
+		return buf;
+	}
+
+	static std::string renderCell(std::string val) {
+		std::string buf("");
+		buf += "<td>";
+		buf += val;
+		buf += "</td>";
+		return buf;
+	}
+
+	std::string renderBody() {
+		std::string buf("");
+		buf += "<tbody>";
+		int i = 0;
+		for (auto const& obj : rowObjects) {
+			buf += this->bodyFunc(obj, i);
+			i++;
+		}
+		buf += "</tbody>";
+		return buf;
+	}
+
+	std::string render() {
+		std::string buf("");
+		// TODO: handle attributes better.
+		if (width != 0) {
+			buf += "<table style='width: ";
+			buf += std::to_string(width);
+			buf += "px'>";
+		}
+		else {
+			buf += "<table>";
+		}
+		buf += this->renderHeader();
+		buf += this->renderBody();
+		buf += "</table>";
+		return buf;
+	}
+};
+
+class HTMLUtils {
+
+	public:
+
+	static std::string URL(std::string href, std::string text) {
+		std::string buf("<a href='");
+		buf += href;
+		buf += "'>";
+		buf += text;
+		buf += "</a>";
+		return buf;
+	}
+
+};
+
 Response* HTMLDisplayDBFiles(char* pattern) {
 	char** filenames;
 
@@ -148,25 +222,41 @@ Response* HTMLDisplayDBFiles(char* pattern) {
 	}
 
 	fo::func::db_free_file_list(&filenames, 0);
-	response += HTMLEnd;
+	response += HTMLEnd;	
 	return responseAllocHTML(response.c_str());
 }
 
 Response* HTMLDisplayMaps() {
-	auto mapBase = fo::var::wmMapInfoList;
+	auto mapsInfo = *(WMMapInfo(*)[])((*(DWORD*)(FO_VAR_wmMapInfoList)));
+	std::vector<WMMapInfo> maps;
+	
+	for (int i = 0; i < fo::var::wmMaxMapNum; i++) {
+		maps.push_back(mapsInfo[i]);
+	}
 	std::string response = std::string(HTMLStart);
 	response += "<p>These are all from Maps.txt</p>";
-	auto mapsInfo = *(WMMapInfo(*)[])((*(DWORD*)(FO_VAR_wmMapInfoList)));
-	for (int i = 0; i < fo::var::wmMaxMapNum; i++) {
-		char buf[128];
-		WMMapInfo map = mapsInfo[i];
-		sprintf(buf, "<a href='/loadmap/%d'>%s.map (music=%s)</a><br/>\n", i, map.mapName, map.music);
-		response += buf;
-	}
-
+	auto table = new HTMLTable<WMMapInfo>();
+	table->width = 400;
+	table->rowObjects = maps;
+	table->headers =  { "Id", "Name", "Music", "Teleport" };
+	table->bodyFunc = [](WMMapInfo map, int idx) -> std::string {
+		auto tr = std::string("");
+		auto url = std::string("/loadmap/");
+		url += std::to_string(idx);
+		tr += "<tr>";
+		tr += HTMLTable<WMMapInfo>::renderCell(std::to_string(idx));
+		tr += HTMLTable<WMMapInfo>::renderCell(map.mapName);
+		tr += HTMLTable<WMMapInfo>::renderCell(map.music);
+		tr += HTMLTable<WMMapInfo>::renderCell(HTMLUtils::URL(url, "Teleport"));
+		tr += "</tr>\n";
+		return tr;
+	};
+	response += table->render();
 	response += HTMLEnd;
 	return responseAllocHTML(response.c_str());
 }
+
+
 
 // needs better url handling ASAP
 struct Response* createResponseForRequest(const struct Request* request, struct Connection* connection) {
@@ -196,19 +286,23 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
 	if (0 == strcmp(request->pathDecoded, "/files/xfopen")) {
 		std::string response = std::string(HTMLStart);
 		response += "<p>These are all the files loaded via the xfopen function.</p>";
-		response += "<table style='width: 400px;'><thead><tr><th>File</th><th>Source</th></thead><tbody>";
-		for (auto const& x : xfopened)
-		{
-			response += "<tr>";
-			response += "<td>";
-			response += x.first;
-			response += "</td>";
-			response += "<td>";
-			response += x.second;
-			response += "</td>";
-			response += "</tr>\n";
-		}
-		response += "</tbody></table>";
+		std::vector<char*> keys;
+		for (auto& kvp : xfopened)
+			keys.push_back(kvp.first);
+
+		auto table = new HTMLTable<char*>();
+		table->width = 400;
+		table->headers = { "File", "Source" };
+		table->rowObjects = keys;
+		table->bodyFunc = [](char* key, int idx) -> std::string {
+			auto tr = std::string("");
+			tr += "<tr>";
+			tr += HTMLTable<void*>::renderCell(key);
+			tr += HTMLTable<void*>::renderCell(xfopened[key]);
+			tr += "</tr>";
+			return tr;
+		};
+		response += table->render();
 		response += HTMLEnd;
 		return responseAllocHTML(response.c_str());
 	}
@@ -218,39 +312,47 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
 		sfall::script::FillListVector(static_cast<DWORD>(FLV::ALL), vec);
 
 		std::string response = std::string(HTMLStart);
-		for (const auto& obj : vec) {
-			response += " id=" + std::to_string(obj->id);
-			response += " protoId=" + std::to_string(obj->protoId);
 
-			response += " scriptId=" + std::to_string(obj->scriptId) + "=";
+		auto table = new HTMLTable<fo::GameObject*>();
+		table->width = 800;
+		table->rowObjects = vec;
+		table->headers = { "Id", "protoId", "scriptId", "scriptData", "x", "y", "sx", "sy", "rotation", "frm", "artFid" };
+		table->bodyFunc = [](fo::GameObject* obj, int idx) -> std::string {
+			auto tr = std::string("");
+			tr += "<tr>";
+			tr += HTMLTable<void*>::renderCell(std::to_string(obj->id));
+			tr += HTMLTable<void*>::renderCell(std::to_string(obj->protoId));
+			tr += HTMLTable<void*>::renderCell(std::to_string(obj->scriptId));
+			auto scriptData = std::string();
 			fo::ScriptInstance* script;
 			if (fo::func::scr_ptr(obj->scriptId, &script) != -1 && script->program != nullptr) {
-				response += std::string(script->program->fileName);
+				scriptData += std::string(script->program->fileName);
 
 				if (fo::func::db_access(script->program->fileName)) {
 					fo::DbFile* intFile = fo::func::db_fopen(script->program->fileName, "r");
 					long intSize = db::filelen(intFile);
 					fo::func::db_fclose(intFile);
 
-					response += "=" + std::to_string(intSize) + "b";
+					scriptData += "=" + std::to_string(intSize) + "b";
 				}
 				else {
-					response += "=?b";
+					scriptData += "=?b";
 				}
 			}
 			else
-				response += "nullptr";
-
-			response += " x=" + std::to_string(obj->x);
-			response += " y=" + std::to_string(obj->y);
-			response += " sx=" + std::to_string(obj->sx);
-			response += " sy=" + std::to_string(obj->sy);
-			response += " rotation=" + std::to_string(obj->rotation);
-			response += " frm=" + std::to_string(obj->frm);
-			response += " artFid=" + std::to_string(obj->artFid);
-
-			response += "<br/>\n";
-		}
+				scriptData += "nullptr";
+			tr += HTMLTable<void*>::renderCell(scriptData);
+			tr += HTMLTable<void*>::renderCell(std::to_string(obj->x));
+			tr += HTMLTable<void*>::renderCell(std::to_string(obj->y));
+			tr += HTMLTable<void*>::renderCell(std::to_string(obj->sx));
+			tr += HTMLTable<void*>::renderCell(std::to_string(obj->sy));
+			tr += HTMLTable<void*>::renderCell(std::to_string(obj->rotation));
+			tr += HTMLTable<void*>::renderCell(std::to_string(obj->frm));
+			tr += HTMLTable<void*>::renderCell(std::to_string(obj->artFid));
+			tr += "</tr>\n";
+			return tr;
+		};
+		response += table->render();
 		response += HTMLEnd;
 
 		return responseAllocHTML(response.c_str());
