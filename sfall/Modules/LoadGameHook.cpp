@@ -297,6 +297,7 @@ end:
 	}
 }
 
+
 static void __declspec(naked) EndLoadHook() {
 	__asm {
 		call fo::funcoffs::EndLoad_;
@@ -774,3 +775,5 @@ Delegate<>& LoadGameHook::OnBeforeGameClose() {
 }
 
 }
+
+void* LoadGameHookFuncAddress = std::addressof(sfall::LoadGame_hook);
