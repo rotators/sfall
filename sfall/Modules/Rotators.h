@@ -1,22 +1,57 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include "Module.h"
 
-namespace sfall
+namespace fo
 {
 
-class Rotators : public Module {
-public:
-	const char* name() { return "Rotators"; }
-	void init();
-	void exit() override;
-
-	static void OnWmRefresh();
-};
+struct DbFile;
 
 }
+
+namespace rfall
+{
+
+class SubModuleManager {
+private:
+	std::vector<std::unique_ptr<sfall::Module>> _modules;
+
+public:
+	SubModuleManager()  = default;
+	~SubModuleManager() = default;
+
+private:
+	// disallow copy constructor and copy assignment because we're dealing with unique_ptr's here
+	SubModuleManager(const SubModuleManager&);
+	void operator = (const SubModuleManager&) {}
+
+public:
+	void initAll();
+	void exitAll();
+
+	template<typename T>
+	void add()
+	{
+		_modules.emplace_back(new T());
+	}
+};
+
+struct Ini {
+	static std::string String(const char* section, const char* setting, const char* defaultValue);
+	static int Int(const char* section, const char* setting, int defaultValue);
+	static std::vector<std::string> List(const char* section, const char* setting, const char* defaultValue, char delim = ',');
+};
+
+struct db {
+	static void* readfile(char* filename, int len);
+	static int filelen(fo::DbFile* file);
+	static void* fastread(char* filename);
+};
 
 // For sfall::script::FillListVector(DWORD type, std::vector<fo::GameObject*>& vec)
 enum class FLV : uint8_t {
@@ -29,3 +64,22 @@ enum class FLV : uint8_t {
 	SPATIAL,
 	ALL = 9
 };
+
+}
+
+namespace sfall
+{
+
+class Rotators : public Module {
+private:
+	rfall::SubModuleManager SubModules;
+
+public:
+	const char* name() { return "Rotators"; }
+	void init();
+	void exit() override;
+
+	static void OnWmRefresh();
+};
+
+}

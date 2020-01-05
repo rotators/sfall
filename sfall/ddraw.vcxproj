@@ -377,6 +377,8 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="Modules\ExtraSaveSlots.h" />
     <ClInclude Include="Modules\Rotators.h" />
+    <ClInclude Include="Modules\Rotators.HTTPD.h" />
+    <ClInclude Include="Modules\Rotators.LoadDll.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CheckAddress.cpp" />
@@ -466,6 +468,8 @@
     <ClCompile Include="Modules\ExtraSaveSlots.cpp" />
     <ClCompile Include="Modules\ScriptShaders.cpp" />
     <ClCompile Include="Modules\Rotators.cpp" />
+    <ClCompile Include="Modules\Rotators.HTTPD.cpp" />
+    <ClCompile Include="Modules\Rotators.LoadDll.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>

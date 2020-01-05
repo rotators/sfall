@@ -289,6 +289,12 @@
     <ClInclude Include="Modules\Rotators.h">
       <Filter>Modules</Filter>
     </ClInclude>
+    <ClInclude Include="Modules\Rotators.HTTPD.h">
+      <Filter>Modules</Filter>
+    </ClInclude>
+    <ClInclude Include="Modules\Rotators.LoadDll.h">
+      <Filter>Modules</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
@@ -536,6 +542,12 @@
     <ClCompile Include="CRC.cpp" />
     <ClCompile Include="CheckAddress.cpp" />
     <ClCompile Include="Modules\Rotators.cpp">
+      <Filter>Modules</Filter>
+    </ClCompile>
+    <ClCompile Include="Modules\Rotators.HTTPD.cpp">
+      <Filter>Modules</Filter>
+    </ClCompile>
+    <ClCompile Include="Modules\Rotators.LoadDll.cpp">
       <Filter>Modules</Filter>
     </ClCompile>
   </ItemGroup>

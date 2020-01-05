@@ -12,30 +12,12 @@
 
 #include "ScriptExtender.h"
 
-#ifdef HTTPD_SERVER
-	#include <thread>
-	#include "..\Lib\EmbeddableWebServer.h"
-
-	void InitHTTPD();
-	static struct Server server;
-	std::thread thread;
-#endif
-
 #include "Rotators.h"
+#include "Rotators.HTTPD.h"
+#include "Rotators.LoadDll.h"
 
 // Remember to wear protective goggles :)
 
-namespace sfall
-{
-	namespace script
-	{
-		// Calls vec.reserve(100) before work
-		// Goes through all elevations (!) and tiles (!!!)
-		void FillListVector(DWORD type, std::vector<fo::GameObject*>& vec);
-	}
-}
-
-const char  rotatorsIni[] = ".\\ddraw.rotators.ini";
 const char* currentTerrainStr;
 
 // DisplayTerrainOnHotspotHover related variables
@@ -44,40 +26,90 @@ bool displayTerrainOnHotspot;
 BYTE terrainOnHotspotTextColor;
 BYTE terrainOnHotspotShadowColor;
 
-// Any and all configuration should be read from ddraw.rotators.ini; /artifacts/ddraw.rotators.ini should be updated to reflect code, when possible;
-// adds some extra work on PR/merge, but pays off in a long run
-/*static*/ struct Ini {
-	static std::string String(const char* section, const char* setting, const char* defaultValue) {
-		return sfall::GetIniString(section, setting, defaultValue, 512, rotatorsIni);
-	}
+//
 
-	static int Int(const char* section, const char* setting, int defaultValue) {
-		return sfall::iniGetInt(section, setting, defaultValue, rotatorsIni);
-	}
-
-	static std::vector<std::string> List(const char* section, const char* setting, const char* defaultValue, char delim = ',') {
-		return sfall::GetIniList(section, setting, defaultValue, 512, delim, rotatorsIni);
-	}
-};
-
-/*** https://github.com/phobos2077/sfall/pull/273 ***/
-static void InitLoadDll() {
-	std::vector<std::string> names = Ini::List("Main", "LoadDll", "");
-
-	for (const auto& name : names) {
-		if (name.empty())
-			continue;
-
-		sfall::dlog_f("Loading %s... ", DL_INIT, name.c_str());
-
-		HMODULE dll = LoadLibraryA(name.c_str());
-
-		if (!dll || dll == INVALID_HANDLE_VALUE)
-			sfall::dlogr("ERROR", DL_INIT);
-		else
-			sfall::dlogr("OK", DL_INIT);
+void rfall::SubModuleManager::initAll() {
+	for (const auto& module : _modules) {
+		sfall::dlog_f("Initializing module Rotators->%s...\n", DL_INIT, module->name());
+		module->init();
 	}
 }
+
+void rfall::SubModuleManager::exitAll() {
+	for (const auto& module : _modules) {
+		sfall::dlog_f("Exiting module Rotators->%s...\n", DL_INIT, module->name());
+		module->exit();
+	}
+}
+
+// Any and all configuration should be read from ddraw.rotators.ini; /artifacts/ddraw.rotators.ini should be updated to reflect code, when possible;
+// adds some extra work on PR/merge, but pays off in a long run
+
+const char  rotatorsIni[] = ".\\ddraw.rotators.ini";
+
+std::string rfall::Ini::String(const char* section, const char* setting, const char* defaultValue) {
+	return sfall::GetIniString(section, setting, defaultValue, 512, rotatorsIni);
+}
+
+int rfall::Ini::Int(const char* section, const char* setting, int defaultValue) {
+	return sfall::iniGetInt(section, setting, defaultValue, rotatorsIni);
+}
+
+std::vector<std::string> rfall::Ini::List(const char* section, const char* setting, const char* defaultValue, char delim /* = ',' */) {
+	return sfall::GetIniList(section, setting, defaultValue, 512, delim, rotatorsIni);
+}
+
+// Shortcuts and filling gaps in fo::func::db_*()
+
+void* rfall::db::readfile(char* filename, int len)
+{
+	auto buffer = malloc(len);
+	__asm {
+		mov eax, filename
+		mov edx, buffer
+		call fo::funcoffs::db_read_to_buf_
+	}
+	return buffer;
+}
+
+int rfall::db::filelen(fo::DbFile* dbFile) {
+	int len=0;
+	__asm {
+		mov eax, dbFile
+		call fo::funcoffs::xfilelength_
+		mov len, eax
+	}
+	return len;
+}
+
+void* rfall::db::fastread(char* filename)
+{
+	if (fo::func::db_access(filename)) {
+		fo::DbFile* file = fo::func::db_fopen(filename, "r");
+		int len = 0;
+
+		__asm {
+			mov eax, file
+			call fo::funcoffs::xfilelength_
+			mov len, eax
+		}
+
+		auto buffer = malloc(len);
+
+		__asm {
+			mov eax, filename
+			mov edx, buffer
+			call fo::funcoffs::db_read_to_buf_
+		}	
+
+		fo::func::db_fclose(file);
+		return buffer;
+	}
+
+	return nullptr;
+}
+
+//
 
 int jmpBack = 0x4BFE89;
 void __declspec(naked) wmDetectHotspotHover() {
@@ -456,26 +488,6 @@ static void _declspec(naked) _xenum_files()
 	}
 }
 
-static void* db_readfile(char* filename, int len)
-{
-	auto buffer = malloc(len);
-	__asm {
-		mov eax, filename
-		mov edx, buffer
-		call fo::funcoffs::db_read_to_buf_
-	}
-	return buffer;
-}
-
-static int db_filelen(int dbFile) {
-	int len=0;
-	__asm {
-		mov eax, dbFile
-		call fo::funcoffs::xfilelength_
-		mov len, eax
-	}
-	return len;
-}
 
 static void* xenum_files(char* searchstring)
 {
@@ -497,7 +509,7 @@ int LoadScreenInit = 0x480AF5;
 static void MainHook() { }
 int LoadSlot;
 static __declspec(naked) void LoadScreenInitHook() {
-	LoadSlot = Ini::Int("Debugging", "AutoLoadSlot", -1);
+	LoadSlot = rfall::Ini::Int("Debugging", "AutoLoadSlot", -1);
 	if (LoadSlot != -1) {
 		__asm {
 			jmp LoadScreenInit
@@ -520,74 +532,11 @@ int autoLoadAfter = 0x47CAE5;
 	}
 }*/
 
-
-
-char* xfopenLoadFile;
-char* xfopenLoadedFrom;
-char* xf1;
-char* xf2;
-int _rewind = 0x004F1411;
-std::map<char*, char*> xfopened;
-
-bool alreadyHasKey = false;
-
-void hasKey(char* key)
-{
-	alreadyHasKey = false;
-	for (auto const& x : xfopened)
-	{
-		if (strcmp(x.first, key) == 0) {
-			alreadyHasKey = true;
-			return;
-		}
-	}
-	return;
-}
-
-static __declspec(naked) void xfopen_hook() {
-	__asm {
-		pushad
-		mov xfopenLoadFile, edi
-		mov eax, dword ptr ss : [ecx]
-		mov xfopenLoadedFrom, eax
-
-	}
-	hasKey(xfopenLoadFile);
-	if (!alreadyHasKey) {
-		xf1 = (char*)malloc(200);
-		xf2 = (char*)malloc(200);
-		memmove(xf1, xfopenLoadFile, 200);
-		memmove(xf2, xfopenLoadedFrom, 200);
-		xfopenLoadFile = "";
-		xfopenLoadedFrom = "";
-		xfopened[xf1] = xf2;
-	}
-	__asm {
-		popad
-		jmp _rewind
-	}
-}
-
-int mapIdToLoad = 0;
-static void loadmap() {
-	__asm {
-		pushad
-		mov eax, [mapIdToLoad]
-		call fo::funcoffs::map_load_idx_
-		popad
-	}
-}
-
-static void OnMainLoop() {
-	if (mapIdToLoad != 0) {
-		loadmap();
-		mapIdToLoad = 0;
-	}
-}
-
 // https://i.imgur.com/0bu4J2l.png
 static void InitTerrainHover()
 {
+	using namespace rfall;
+
 	displayTerrainOnHotspot     = Ini::Int("Interface", "DisplayTerrainOnHotspotHover", 0);
 	terrainOnHotspotTextColor   = Ini::Int("Interface", "TerrainOnHotspotTextColor", 215);
 	terrainOnHotspotShadowColor = Ini::Int("Interface", "TerrainOnHotspotTextShadowColor", 228);
@@ -598,211 +547,20 @@ static void InitTerrainHover()
 
 void sfall::Rotators::init()
 {
-	SafeWrite8(0x410003,0xF4);
-	InitLoadDll();
+	SafeWrite8(0x410003, 0xF4);
+
+	#ifdef HTTPD_SERVER
+	SubModules.add<HTTPD>();
+	#endif
+	SubModules.add<LoadDll>();
+
+	SubModules.initAll();
+
 	InitTerrainHover();
-	xfopenLoadFile = (char*)malloc(200);
-	xfopenLoadedFrom = (char*)malloc(200);
-	sfall::MakeCall(0x4DEFCD, xfopen_hook);
-	sfall::MainLoopHook::OnMainLoop() += OnMainLoop;
 	//sfall::MakeCall(0x4DFF33, _xenum_files);
 	//sfall::MakeJump(0x480A23, LoadScreenInitHook);
-	#ifdef HTTPD_SERVER
-	thread = std::thread(InitHTTPD);
-	#endif
 }
 
-void sfall::Rotators::exit()
-{
-	#ifdef HTTPD_SERVER
-	serverDeInit(&server);
-	thread.join();
-	#endif
+void sfall::Rotators::exit() {
+	SubModules.exitAll();
 }
-
-static void* db_fastread(char* filename)
-{
-	if (fo::func::db_access(filename)) {
-
-		fo::DbFile* file = fo::func::db_fopen(filename, "r");
-		int len = 0;
-
-		__asm {
-			mov eax, file
-			call fo::funcoffs::xfilelength_
-			mov len, eax
-		}
-
-		auto buffer = malloc(len);
-
-		__asm {
-			mov eax, filename
-			mov edx, buffer
-			call fo::funcoffs::db_read_to_buf_
-		}	
-
-		fo::func::db_fclose(file);
-		return buffer;
-	}
-
-	return nullptr;
-}
-
-// Move this somewhere else, when/if it grows too much
-#ifdef HTTPD_SERVER
-std::string DocumentRoot;
-
-void InitHTTPD()
-{
-	DocumentRoot = Ini::String("HTTP", "DocumentRoot", ".");
-	serverInit(&server);
-	struct sockaddr_in localhost = { 0 };
-	localhost.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-	localhost.sin_family = AF_INET;
-	localhost.sin_port = htons(1207);
-
-	acceptConnectionsUntilStopped(&server, (struct sockaddr*) & localhost, sizeof(localhost));
-}
-
-bool DoesFileExist(const char* filename) {
-	struct stat st;
-	int result = stat(filename, &st);
-	return result == 0;
-}
-
-char* HTMLStart = R"HTML_S(<!DOCTYPE html>
-	<!DOCTYPE html>
-	<html>
-	<head>
-		<title>sfall UI</title>
-		<link rel="stylesheet" href="/style.css" type="text/css" />
-	</head>
-	<body>)HTML_S";
-
-char* HTMLEnd = R"HTML_S(</body></html>)HTML_S";
-
-Response* HTMLDisplayDBFiles(char* pattern) {
-	char** filenames;
-	int count = fo::func::db_get_file_list(pattern, &filenames);
-	std::string response = std::string(HTMLStart);
-	for (auto i = 0; i < count; i++) {
-		response += filenames[i];
-		response += "<br/>\n";
-	}
-	fo::func::db_free_file_list(&filenames, 0);
-	response += HTMLEnd;
-	return responseAllocHTML(response.c_str());
-}
-
-Response* HTMLDisplayMaps() {
-	auto mapBase = fo::var::wmMapInfoList;
-	std::string response = std::string(HTMLStart);
-	for (int i = 0; i < fo::var::wmMaxMapNum; i++) {
-		char* name = reinterpret_cast<char*>(mapBase + (i * 0x248) + 0x30); // 0x4BFA05 & 4BFA18
-		char buf[128];
-		sprintf(buf, "<a href='/loadmap/%d'>%s.map</a><br/>\n", i, name);
-		response += buf;
-	}
-	response += HTMLEnd;
-	response += HTMLEnd;
-	return responseAllocHTML(response.c_str());
-}
-
-char* respString;
-struct Response* createResponseForRequest(const struct Request* request, struct Connection* connection) {
-	// RESERVED
-	// /db/*
-
-	if (0 == strcmp(request->pathDecoded, "/")
-		|| 0 == strcmp(request->pathDecoded, "/style.css")
-		|| 0 == strcmp(request->pathDecoded, "/script.js")) {
-		return responseAllocServeFileFromRequestPath("/", request->path, request->pathDecoded, DocumentRoot.c_str());
-	}
-
-	if (0 == strncmp(request->pathDecoded, "/loadmap/", 9)) {
-		std::vector<std::string> spl = sfall::split(std::string(request->pathDecoded), '/');
-		char* cstr = (char*)malloc(32);
-		int id = strtol(spl[2].c_str(), NULL, 10);
-		mapIdToLoad = id;
-		return HTMLDisplayMaps();
-	}
-	if (0 == strcmp(request->pathDecoded, "/files/scripts")) {	return HTMLDisplayDBFiles("scripts\\*.int"); }
-	if (0 == strcmp(request->pathDecoded, "/files/maps")) {
-		return HTMLDisplayMaps();
-	}
-
-	if (0 == strcmp(request->pathDecoded, "/files/xfopen")) {
-		std::string response = std::string(HTMLStart);
-		response += "<p>These are all the files loaded via the xfopen function.</p>";
-		response += "<table style='width: 400px;'><thead><tr><th>File</th><th>Source</th></thead><tbody>";
-		for (auto const& x : xfopened)
-		{
-			response += "<tr>";
-			response += "<td>";
-			response += x.first;
-			response += "</td>";
-			response += "<td>";
-			response += x.second;
-			response += "</td>";
-			response += "</tr>\n";
-		}
-		response += "</tbody></table>";
-		response += HTMLEnd;
-		return responseAllocHTML(response.c_str());
-	}
-
-	if (0 == strcmp(request->pathDecoded, "/dump/game-objects")) {
-		std::vector<fo::GameObject*> vec;
-		sfall::script::FillListVector(static_cast<DWORD>(FLV::ALL), vec);
-
-		std::string response = std::string(HTMLStart);
-		for (const auto& obj : vec) {
-			response += " id=" + std::to_string(obj->id);
-			response += " protoId=" + std::to_string(obj->protoId);
-
-			response += " scriptId=" + std::to_string(obj->scriptId) + "=";
-			fo::ScriptInstance* script;
-			if (fo::func::scr_ptr(obj->scriptId, &script) != -1 && script->program != nullptr) {
-				response += std::string(script->program->fileName);
-
-				if (fo::func::db_access(script->program->fileName)) {
-					//static constexpr long DB_SEEK_SET = 0;
-					//static constexpr long DB_SEEK_CURR = 1;
-					//static constexpr long DB_SEEK_END = 2;
-					fo::DbFile* intFile = fo::func::db_fopen(script->program->fileName, "r");
-					long intSize = db_filelen((int)intFile);
-					fo::func::db_fclose(intFile);
-					//fo::func::db_fseek(intFile, 0, DB_SEEK_SET);
-					//fo::func::db_fclose(intFile);
-
-					response += "=" + std::to_string(intSize) + "b";
-				}
-				else {
-					response += "=?b";
-				}
-			}
-			else
-				response += "nullptr";
-
-			response += " x=" + std::to_string(obj->x);
-			response += " y=" + std::to_string(obj->y);
-			response += " sx=" + std::to_string(obj->sx);
-			response += " sy=" + std::to_string(obj->sy);
-			response += " rotation=" + std::to_string(obj->rotation);
-			response += " frm=" + std::to_string(obj->frm);
-			response += " artFid=" + std::to_string(obj->artFid);
-
-			response += "<br/>\n";
-		}
-		response += HTMLEnd;
-
-		return responseAllocHTML(response.c_str());
-	}
-
-	/* Serve files from the current directory */
-	if (request->pathDecoded == strstr(request->pathDecoded, "/files")) {
-		return responseAllocServeFileFromRequestPath("/files", request->path, request->pathDecoded, ".");
-	}
-	return responseAlloc404NotFoundHTML("You don't see anything out of the ordinary.");
-}
-#endif
