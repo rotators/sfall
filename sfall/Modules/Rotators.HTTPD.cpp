@@ -35,16 +35,16 @@ bool alreadyHasKey = false;
 
 //
 
-char* HTMLStart = R"HTML_S(<!DOCTYPE html>
+char* HTMLStart = R"HTML_S(
 	<!DOCTYPE html>
 	<html>
 	<head>
 		<title>sfall UI</title>
 		<link rel="stylesheet" href="/style.css" type="text/css" />
-	</head>
-	<body>)HTML_S";
+	</head>)HTML_S";
 
-char* HTMLEnd = R"HTML_S(</body></html>)HTML_S";
+char* HTMLEnd = R"HTML_S(
+</html>)HTML_S";
 
 static void loadmap() {
 	__asm {
@@ -138,62 +138,157 @@ bool DoesFileExist(const char* filename) {
 	return result == 0;
 }
 
+enum HTMLTag {
+	a,
+	body,
+	div_,
+	html,
+	td,
+	tr,
+	th,
+	table,
+	tbody,
+	thead,
+	p,
+};
+
+// Start indentation to be under <body>
+BYTE HTMLIdentation = 2;
+
+// https://developer.mozilla.org/en-US/docs/Web/HTML/Element
+class HTMLElement {
+	public:
+		HTMLTag tag;
+		std::map<std::string, std::string> attributes;
+		std::string innerHTML;
+		std::vector<HTMLElement*> children;
+
+		HTMLElement::HTMLElement(HTMLTag tag) {
+			this->tag = tag;
+		}
+
+		HTMLElement::HTMLElement(HTMLTag tag, std::string innerHTML) {
+			this->tag = tag;
+			this->innerHTML = innerHTML;
+		}
+
+		HTMLElement* add(HTMLElement* child) {
+			this->children.push_back(child);
+			return this;
+		}
+
+		std::string getTagStr() {
+			switch (tag) {
+				case HTMLTag::a:     return "a";
+				case HTMLTag::div_:  return "div";
+				case HTMLTag::body:  return "body";
+				case HTMLTag::td:    return "td";
+				case HTMLTag::tr:    return "tr";
+				case HTMLTag::th:    return "th";
+				case HTMLTag::table: return "table";
+				case HTMLTag::tbody: return "tbody";
+				case HTMLTag::thead: return "thead";
+				case HTMLTag::p:     return "p";
+				default: throw "invalid tag";
+			}
+		}
+
+		std::string render() {
+			auto tag = this->getTagStr();
+			std::string buf("");
+			buf += '\n';
+			// make sure that stuff is properly indented in the generated source.
+			for (auto i = 0; i < HTMLIdentation;i++) {
+				buf += '\t';
+			}
+
+			buf += '<';
+			buf += tag;
+			if (attributes.size() > 0)
+				buf += ' ';
+
+			bool first = true;
+			for (auto attr : attributes) {
+				buf += attr.first;
+				buf += '=';
+				buf += '"';
+				buf += attr.second;
+				buf += '"';
+				if (!first) {
+					buf += ' ';
+				}
+				first = false;
+			}
+
+			buf += '>';
+			HTMLIdentation++;
+			for (auto ch : children) {
+				buf += ch->render();
+			}
+			HTMLIdentation--;
+			buf += innerHTML;
+			if (children.size() != 0) {
+				buf += '\n';
+				for (auto i = 0; i < HTMLIdentation; i++) {
+					buf += '\t';
+				}
+			}
+			buf += "</";
+			buf += tag;
+			buf += ">";
+			return buf;
+		}
+
+		static HTMLElement* a(std::string innerHTML) { return new HTMLElement(HTMLTag::a, innerHTML); }
+		static HTMLElement* div() { return new HTMLElement(HTMLTag::div_); }
+		static HTMLElement* tbody() { return new HTMLElement(HTMLTag::tbody); }
+		static HTMLElement* tbody(std::string innerHTML) { return new HTMLElement(HTMLTag::tbody, innerHTML); }
+		static HTMLElement* thead() { return new HTMLElement(HTMLTag::thead); }
+		static HTMLElement* td(std::string innerHTML) { return new HTMLElement(HTMLTag::td, innerHTML); }
+		static HTMLElement* td() { return new HTMLElement(HTMLTag::td); }
+		static HTMLElement* th(std::string innerHTML) { return new HTMLElement(HTMLTag::th, innerHTML); }
+		static HTMLElement* tr() { return new HTMLElement(HTMLTag::tr); }
+		static HTMLElement* p() { return new HTMLElement(HTMLTag::p); }
+		static HTMLElement* p(std::string innerHTML) { return new HTMLElement(HTMLTag::p, innerHTML); }
+};
+
 template<typename T>
 class HTMLTable {
 	public:
 		int width=0;
 		std::vector<T> rowObjects;
 		std::vector<std::string> headers;
-		std::function<std::string(T, int)> bodyFunc;
+		std::function<HTMLElement*(T, int)> bodyFunc;
 
-	std::string renderHeader() {
-		std::string buf("");
-		buf += "<thead><tr>";
-		for (auto const& h : headers)
-		{
-			buf += "<th>";
-			buf += h;
-			buf += "</th>";
-		}
-		buf += "</tr></thead>";
-		return buf;
+	HTMLElement* createHeader() {
+		auto thead = new HTMLElement(HTMLTag::thead);
+		auto tr = HTMLElement::tr();
+		thead->children.push_back(tr);
+		for (auto const& text : headers)
+			tr->children.push_back(HTMLElement::th(text));
+		return thead;
 	}
 
 	static std::string renderCell(std::string val) {
-		std::string buf("");
-		buf += "<td>";
-		buf += val;
-		buf += "</td>";
-		return buf;
+		return HTMLElement::td(val)->render();
 	}
 
-	std::string renderBody() {
-		std::string buf("");
-		buf += "<tbody>";
+	HTMLElement* createBody() {
+		auto tbody = HTMLElement::tbody();
 		int i = 0;
 		for (auto const& obj : rowObjects) {
-			buf += this->bodyFunc(obj, i);
-			i++;
+			tbody->add(this->bodyFunc(obj, i++));
 		}
-		buf += "</tbody>";
-		return buf;
+		return tbody;
 	}
 
-	std::string render() {
-		std::string buf("");
-		// TODO: handle attributes better.
-		if (width != 0) {
-			buf += "<table style='width: ";
-			buf += std::to_string(width);
-			buf += "px'>";
-		}
-		else {
-			buf += "<table>";
-		}
-		buf += this->renderHeader();
-		buf += this->renderBody();
-		buf += "</table>";
-		return buf;
+	HTMLElement* get() {
+		auto table = new HTMLElement(HTMLTag::table);
+		if (width != 0)
+			table->attributes["style"] = "width: " + std::to_string(width) + "px";
+		table->add(this->createHeader());
+		table->add(this->createBody());
+		return table;
 	}
 };
 
@@ -201,15 +296,11 @@ class HTMLUtils {
 
 	public:
 
-	static std::string URL(std::string href, std::string text) {
-		std::string buf("<a href='");
-		buf += href;
-		buf += "'>";
-		buf += text;
-		buf += "</a>";
-		return buf;
+	static HTMLElement* URL(std::string href, std::string text) { 
+		auto a = HTMLElement::a(text); 
+		a->attributes["href"] = href;
+		return a;
 	}
-
 };
 
 Response* HTMLDisplayDBFiles(char* pattern) {
@@ -228,7 +319,8 @@ Response* HTMLDisplayDBFiles(char* pattern) {
 	return responseAllocHTML(response.c_str());
 }
 
-Response* HTMLDisplayMaps() {
+HTMLElement* HTMLDisplayMaps() {
+	auto div = HTMLElement::div();
 	auto mapsInfo = *(WMMapInfo(*)[])((*(DWORD*)(FO_VAR_wmMapInfoList)));
 	std::vector<WMMapInfo> maps;
 	
@@ -236,26 +328,23 @@ Response* HTMLDisplayMaps() {
 		maps.push_back(mapsInfo[i]);
 	}
 	std::string response = std::string(HTMLStart);
-	response += "<p>These are all from Maps.txt</p>";
+	div->add(HTMLElement::p("These are all from Maps.txt"));
 	auto table = new HTMLTable<WMMapInfo>();
 	table->width = 400;
 	table->rowObjects = maps;
 	table->headers =  { "Id", "Name", "Music", "Teleport" };
-	table->bodyFunc = [](WMMapInfo map, int idx) -> std::string {
-		auto tr = std::string("");
-		auto url = std::string("/loadmap/");
-		url += std::to_string(idx);
-		tr += "<tr>";
-		tr += HTMLTable<WMMapInfo>::renderCell(std::to_string(idx));
-		tr += HTMLTable<WMMapInfo>::renderCell(map.mapName);
-		tr += HTMLTable<WMMapInfo>::renderCell(map.music);
-		tr += HTMLTable<WMMapInfo>::renderCell(HTMLUtils::URL(url, "Teleport"));
-		tr += "</tr>\n";
+	table->bodyFunc = [](WMMapInfo map, int idx) -> HTMLElement* {
+		auto href = std::string("/loadmap/");
+		href += std::to_string(idx);
+		auto tr = HTMLElement::tr();
+		tr->add(HTMLElement::td(std::to_string(idx)));
+		tr->add(HTMLElement::td(map.mapName));
+		tr->add(HTMLElement::td(map.music));
+		tr->add(HTMLElement::td()->add(HTMLUtils::URL(href, "Teleport")));
 		return tr;
 	};
-	response += table->render();
-	response += HTMLEnd;
-	return responseAllocHTML(response.c_str());
+	div->add(table->get());
+	return div;
 }
 
 
@@ -264,10 +353,19 @@ Response* HTMLDisplayMaps() {
 #define DOC_ROOT responseAllocServeFileFromRequestPath("/", request->path, request->pathDecoded, DocumentRoot.c_str())
 #define DOC_INDEX responseAllocServeFileFromRequestPath("/", "/index.html", "/index.html", DocumentRoot.c_str())
 
+std::string RenderBody(HTMLElement* body) {
+	std::string response = std::string(HTMLStart);
+	response += body->render();
+	response += HTMLEnd;
+	return response;
+}
+
 // needs better url handling ASAP
 struct Response* createResponseForRequest(const struct Request* request, struct Connection* connection) {
 	// RESERVED
 	// /db/*
+
+	auto body = new HTMLElement(HTMLTag::body);
 
 	if (IS_URL("/") || IS_URL("/style.css")|| IS_URL("/script.js")) {
 		return DOC_ROOT;
@@ -278,14 +376,17 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
 		if (spl.size() == 3) {
 			mapIdToLoad = std::stoi(spl[2]);
 		}
-		return HTMLDisplayMaps();
+		body->add(HTMLDisplayMaps());
+		return responseAllocHTML(RenderBody(body).c_str());
 	}
 
 	if (IS_URL("/files/scripts"))
 		return HTMLDisplayDBFiles("scripts\\*.int");
 
-	if (IS_URL("/files/maps"))
-		return HTMLDisplayMaps();
+	if (IS_URL("/files/maps")) {
+		body->add(HTMLDisplayMaps());
+		return responseAllocHTML(RenderBody(body).c_str());
+	}
 
 	if (IS_URL("/cheats/give-xp")) {
 		fo::func::stat_pc_add_experience(10000);
@@ -293,8 +394,7 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
 	}
 
 	if (IS_URL("/files/xfopen")) {
-		std::string response = std::string(HTMLStart);
-		response += "<p>These are all the files loaded via the xfopen function.</p>";
+		body->add(HTMLElement::p("These are all the files loaded via the xfopen function."));
 		std::vector<char*> keys;
 		for (auto& kvp : xfopened)
 			keys.push_back(kvp.first);
@@ -303,17 +403,14 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
 		table->width = 400;
 		table->headers = { "File", "Source" };
 		table->rowObjects = keys;
-		table->bodyFunc = [](char* key, int idx) -> std::string {
-			auto tr = std::string("");
-			tr += "<tr>";
-			tr += HTMLTable<void*>::renderCell(key);
-			tr += HTMLTable<void*>::renderCell(xfopened[key]);
-			tr += "</tr>";
+		table->bodyFunc = [](char* key, int idx) -> HTMLElement* {
+			auto tr = HTMLElement::tr();
+			tr->add(HTMLElement::td(key));
+			tr->add(HTMLElement::td(xfopened[key]));
 			return tr;
 		};
-		response += table->render();
-		response += HTMLEnd;
-		return responseAllocHTML(response.c_str());
+		body->add(table->get());
+		return responseAllocHTML(RenderBody(body).c_str());
 	}
 
 	if (IS_URL("/dump/game-objects")) {
@@ -326,12 +423,11 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
 		table->width = 1200;
 		table->rowObjects = vec;
 		table->headers = { "Id", "protoId", "scriptId", "scriptData", "x", "y", "sx", "sy", "rotation", "frm", "artFid", "artName" };
-		table->bodyFunc = [](fo::GameObject* obj, int idx) -> std::string {
-			auto tr = std::string("");
-			tr += "<tr>";
-			tr += HTMLTable<void*>::renderCell(std::to_string(obj->id));
-			tr += HTMLTable<void*>::renderCell(std::to_string(obj->protoId));
-			tr += HTMLTable<void*>::renderCell(std::to_string(obj->scriptId));
+		table->bodyFunc = [](fo::GameObject* obj, int idx) -> HTMLElement* {
+			auto tr = HTMLElement::tr();
+			tr->add(HTMLElement::td(std::to_string(obj->id)));
+			tr->add(HTMLElement::td(std::to_string(obj->protoId)));
+			tr->add(HTMLElement::td(std::to_string(obj->scriptId)));
 			auto scriptData = std::string();
 			fo::ScriptInstance* script;
 			if (fo::func::scr_ptr(obj->scriptId, &script) != -1 && script->program != nullptr) {
@@ -350,22 +446,19 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
 			}
 			else
 				scriptData += "nullptr";
-			tr += HTMLTable<void*>::renderCell(scriptData);
-			tr += HTMLTable<void*>::renderCell(std::to_string(obj->x));
-			tr += HTMLTable<void*>::renderCell(std::to_string(obj->y));
-			tr += HTMLTable<void*>::renderCell(std::to_string(obj->sx));
-			tr += HTMLTable<void*>::renderCell(std::to_string(obj->sy));
-			tr += HTMLTable<void*>::renderCell(std::to_string(obj->rotation));
-			tr += HTMLTable<void*>::renderCell(std::to_string(obj->frm));
-			tr += HTMLTable<void*>::renderCell(std::to_string(obj->artFid));
-			tr += HTMLTable<void*>::renderCell(std::string(fo::func::art_get_name(obj->artFid)));
-			tr += "</tr>\n";
+			tr->add(HTMLElement::td(scriptData));
+			tr->add(HTMLElement::td(std::to_string(obj->x)));
+			tr->add(HTMLElement::td(std::to_string(obj->y)));
+			tr->add(HTMLElement::td(std::to_string(obj->sx)));
+			tr->add(HTMLElement::td(std::to_string(obj->sy)));
+			tr->add(HTMLElement::td(std::to_string(obj->rotation)));
+			tr->add(HTMLElement::td(std::to_string(obj->frm)));
+			tr->add(HTMLElement::td(std::to_string(obj->artFid)));
+			tr->add(HTMLElement::td(std::string(fo::func::art_get_name(obj->artFid))));
 			return tr;
 		};
-		response += table->render();
-		response += HTMLEnd;
-
-		return responseAllocHTML(response.c_str());
+		body->add(table->get());
+		return responseAllocHTML(RenderBody(body).c_str());
 	}
 	return responseAlloc404NotFoundHTML("You don't see anything out of the ordinary.");
 }
