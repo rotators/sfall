@@ -33,17 +33,6 @@ int _rewind = 0x004F1411;
 std::map<char*, char*> xfopened;
 bool alreadyHasKey = false;
 
-// TODO reimplement in Rotators.cpp
-namespace sfall
-{
-	namespace script
-	{
-		// Calls vec.reserve(100) before work
-		// Goes through all elevations (!) and tiles (!!!)
-		void FillListVector(DWORD type, std::vector<fo::GameObject*>& vec);
-	}
-}
-
 //
 
 char* HTMLStart = R"HTML_S(<!DOCTYPE html>
@@ -329,7 +318,7 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
 
 	if (IS_URL("/dump/game-objects")) {
 		std::vector<fo::GameObject*> vec;
-		sfall::script::FillListVector(static_cast<DWORD>(FLV::ALL), vec);
+		misc::FillListVector(misc::FLV::CRITTERS, vec);
 
 		std::string response = std::string(HTMLStart);
 

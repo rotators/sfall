@@ -11,6 +11,7 @@ namespace fo
 {
 
 struct DbFile;
+struct GameObject;
 
 }
 
@@ -53,16 +54,19 @@ struct db {
 	static void* fastread(char* filename);
 };
 
-// For sfall::script::FillListVector(DWORD type, std::vector<fo::GameObject*>& vec)
-enum class FLV : uint8_t {
-	CRITTERS = 0,
-	GROUNDITEMS,
-	SCENERY,
-	WALLS,
-	TILES, // Disabled
-	MISC,
-	SPATIAL,
-	ALL = 9
+struct misc {
+	enum class FLV : uint8_t {
+		CRITTERS = 0,
+		GROUNDITEMS,
+		SCENERY,
+		WALLS,
+		TILES, // Disabled
+		MISC,
+		SPATIAL,
+		ALL = 9
+	};
+
+	static void rfall::misc::FillListVector(FLV type, std::vector<fo::GameObject*>& vec, int8_t elevation = -1); // -2=all -1=current 0-2=specific
 };
 
 }
