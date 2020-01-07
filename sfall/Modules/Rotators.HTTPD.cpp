@@ -140,6 +140,7 @@ bool DoesFileExist(const char* filename) {
 
 enum HTMLTag {
 	a,
+	br,
 	body,
 	div_,
 	html,
@@ -163,6 +164,12 @@ class HTMLElement {
 		std::string innerHTML;
 		std::vector<HTMLElement*> children;
 
+		HTMLElement::~HTMLElement() {
+			for (auto ch : children) {
+				delete(ch);
+			}
+		}
+
 		HTMLElement::HTMLElement(HTMLTag tag) {
 			this->tag = tag;
 		}
@@ -180,6 +187,7 @@ class HTMLElement {
 		std::string getTagStr() {
 			switch (tag) {
 				case HTMLTag::a:     return "a";
+				case HTMLTag::br:    return "br";
 				case HTMLTag::div_:  return "div";
 				case HTMLTag::body:  return "body";
 				case HTMLTag::td:    return "td";
@@ -190,6 +198,13 @@ class HTMLElement {
 				case HTMLTag::thead: return "thead";
 				case HTMLTag::p:     return "p";
 				default: throw "invalid tag";
+			}
+		}
+		
+		bool selfClosing() {
+			switch (tag) {
+				case HTMLTag::br: return true;
+				default: return false;
 			}
 		}
 
@@ -219,8 +234,13 @@ class HTMLElement {
 				}
 				first = false;
 			}
-
-			buf += '>';
+			if (selfClosing()) {
+				buf += "/>";
+				return buf;
+			}
+			else {
+				buf += '>';
+			}
 			HTMLIdentation++;
 			for (auto ch : children) {
 				buf += ch->render();
@@ -250,6 +270,169 @@ class HTMLElement {
 		static HTMLElement* tr() { return new HTMLElement(HTMLTag::tr); }
 		static HTMLElement* p() { return new HTMLElement(HTMLTag::p); }
 		static HTMLElement* p(std::string innerHTML) { return new HTMLElement(HTMLTag::p, innerHTML); }
+};
+
+enum RouteParserType {
+	u8,
+	u16,
+	u32,
+	i8,
+	i16,
+	i32,
+	str
+};
+
+class Route {
+	public:
+		virtual Response* match() = 0;
+		virtual void setContext(HTMLElement* body, char* decoded) = 0;
+};
+
+#define CHECK_TYPE(__type) if (spl[1].compare(#__type) == 0) tagtype = RouteParserType::__type
+template<typename T>
+class RouteParser : public Route {
+	public:
+		RouteParser(std::string _template, std::function<Response*(RouteParser<T>*, HTMLElement*)> handler) {
+			this->_template = _template;
+			this->handler = handler;
+		}
+		std::map<std::string, std::string> variables;
+		char* decoded;
+		HTMLElement* body;
+		std::function<Response*(RouteParser<T>*, HTMLElement*)> handler;
+		std::string _template;
+		void setContext(HTMLElement* body, char* decoded) {
+			this->body = body;
+			this->decoded = decoded;
+		}
+		Response* match() {
+			if (matchTemplate(decoded, _template)) {
+				return this->handler(this, body);
+			}
+			return NULL;
+		}
+		virtual void parseVariables(){};
+
+		// /loadmap/{id:u8}/{s:str}
+	private:
+		// Validate templates
+		// {id:u8} = variable is named id and the type is uint8
+		// Datatypes: u8, u16, u32, i8, i16, i32, str (char*)
+		bool matchTemplate(char decoded[1024], std::string _template) {
+			bool parsingTag = false;
+			std::string tagname("");
+			RouteParserType tagtype;
+			std::string tagbuf("");
+			std::string matchbuf(""); // The decoded buffer that we compare with our tagbuf.
+			char parseUntil = ' '; // What character is the next character after the tag ends?
+
+			int pd=0; // pos of decoded
+			int pt=0; // pos of template
+
+			int maxLen = strlen(decoded);
+			int parseState=0;
+
+			bool done = false;
+			while(!done) {
+				switch (parseState) {
+					case 0: {
+						if (_template[pt] == '{') {
+							parseState = 1;
+							continue;
+						}
+						if (decoded[pd++] != _template[pt++])
+							return false;
+					} break;
+					case 1: { // Parse tag contents (everything in {})
+						if (_template[pt] == '}') {
+							parseState = 2;
+
+							// Validate tag contents
+							if (strstr(tagbuf.c_str(), ":") == NULL) {
+								throw "no seperator : in tag";
+							}
+							auto spl = sfall::split(tagbuf, ':');
+							tagname = spl[0].substr(1);
+							matchbuf = "";
+							
+							CHECK_TYPE(u8); CHECK_TYPE(u16); CHECK_TYPE(u32); //CHECK_TYPE(u64);
+							CHECK_TYPE(i8); CHECK_TYPE(i16); CHECK_TYPE(i32); //CHECK_TYPE(i64);
+							CHECK_TYPE(str);
+
+							if (pt + 1 == _template.size()) {
+								parseUntil = '\0'; // Parse until the end
+							}
+							else {
+								parseUntil = _template[pt + 1];
+							}
+							continue;
+						}
+
+						tagbuf += _template[pt++];
+					} break;
+					case 2: { // Compare with decoded string.
+						if (decoded[pd] == parseUntil || pd == 1024) {
+							try {
+								if (tagtype != RouteParserType::str) {
+									auto i = std::stoi(matchbuf);
+									auto ui = std::stoul(matchbuf);
+									switch (tagtype) {
+										case u8: if (i < 0 || i > 255) return false;
+											break;
+										case u16: if (i < 0 || i > 65535) return false;
+											break;
+										case u32: if (i < 0) return false;
+											break;
+										case i8:  if (i < -128 || i > 127) return false;
+											break;
+										case i16: if (i < 0 || i > 65535) return false;
+											break;
+										case i32: if (ui > 2147483647) return false;
+											break;
+									}
+								}
+							}
+							catch (...) { return false; } // Since value couldn't be parsed, it's not a matching route.
+
+							// Add the captured variable
+							variables[tagname] = matchbuf;
+
+							// Are we done?
+							if (pd < maxLen) {
+								parseState = 0;
+							}
+							else {
+								done = true;
+							}
+							continue;
+						}
+
+						matchbuf += decoded[pd++];
+					} break;
+				}
+			}
+			parseVariables();
+			return true;
+		}
+};
+
+// Not nice...
+class IdRoute : public RouteParser<IdRoute> {
+	  public: 
+		  unsigned long id;
+	  IdRoute(std::string __template, std::function<Response*(RouteParser<IdRoute>*, HTMLElement*)> handler) : RouteParser(__template, handler) {};
+	  void parseVariables() {
+		 id = std::stoul(this->variables["id"]);
+	  }
+};
+
+class GameObjectRoute : public RouteParser<GameObjectRoute> {
+public:
+	rfall::misc::FLV type;
+	GameObjectRoute(std::string __template, std::function<Response * (RouteParser<GameObjectRoute >*, HTMLElement*)> handler) : RouteParser(__template, handler) {};
+	void parseVariables() {
+		type = (rfall::misc::FLV)std::stoul(this->variables["type"]);
+	}
 };
 
 template<typename T>
@@ -348,74 +531,33 @@ HTMLElement* HTMLDisplayMaps() {
 }
 
 
-// Some route templating would be a better idea, this is just a short term sanity saver
-#define IS_URL(__path) 0 == strcmp(request->pathDecoded, __path)
-#define DOC_ROOT responseAllocServeFileFromRequestPath("/", request->path, request->pathDecoded, DocumentRoot.c_str())
-#define DOC_INDEX responseAllocServeFileFromRequestPath("/", "/index.html", "/index.html", DocumentRoot.c_str())
+
 
 std::string RenderBody(HTMLElement* body) {
 	std::string response = std::string(HTMLStart);
 	response += body->render();
 	response += HTMLEnd;
+	delete body;
 	return response;
 }
 
-// needs better url handling ASAP
-struct Response* createResponseForRequest(const struct Request* request, struct Connection* connection) {
-	// RESERVED
-	// /db/*
-
-	auto body = new HTMLElement(HTMLTag::body);
-
-	if (IS_URL("/") || IS_URL("/style.css")|| IS_URL("/script.js")) {
-		return DOC_ROOT;
-	}
-
-	if (0 == strncmp(request->pathDecoded, "/loadmap/", 9)) {
-		auto spl = sfall::split(std::string(request->pathDecoded), '/');
-		if (spl.size() == 3) {
-			mapIdToLoad = std::stoi(spl[2]);
-		}
+// :)
+#define ADD_ROUTE(__class, __template) routes.push_back(new __class(std::string(__template), ([](RouteParser<__class>* ctx, HTMLElement* body) -> Response*
+#define IS_URL(__path) 0 == strcmp(request->pathDecoded, __path)
+#define DOC_ROOT responseAllocServeFileFromRequestPath("/", request->path, request->pathDecoded, DocumentRoot.c_str())
+#define DOC_INDEX responseAllocServeFileFromRequestPath("/", "/index.html", "/index.html", DocumentRoot.c_str())
+std::vector<Route*> routes;
+void InitRoutes() {
+	ADD_ROUTE(IdRoute, "/loadmap/{id:u8}") {
+		mapIdToLoad = ((IdRoute*)ctx)->id;
 		body->add(HTMLDisplayMaps());
 		return responseAllocHTML(RenderBody(body).c_str());
-	}
+	})));
 
-	if (IS_URL("/files/scripts"))
-		return HTMLDisplayDBFiles("scripts\\*.int");
-
-	if (IS_URL("/files/maps")) {
-		body->add(HTMLDisplayMaps());
-		return responseAllocHTML(RenderBody(body).c_str());
-	}
-
-	if (IS_URL("/cheats/give-xp")) {
-		fo::func::stat_pc_add_experience(10000);
-		return DOC_INDEX;
-	}
-
-	if (IS_URL("/files/xfopen")) {
-		body->add(HTMLElement::p("These are all the files loaded via the xfopen function."));
-		std::vector<char*> keys;
-		for (auto& kvp : xfopened)
-			keys.push_back(kvp.first);
-
-		auto table = new HTMLTable<char*>();
-		table->width = 400;
-		table->headers = { "File", "Source" };
-		table->rowObjects = keys;
-		table->bodyFunc = [](char* key, int idx) -> HTMLElement* {
-			auto tr = HTMLElement::tr();
-			tr->add(HTMLElement::td(key));
-			tr->add(HTMLElement::td(xfopened[key]));
-			return tr;
-		};
-		body->add(table->get());
-		return responseAllocHTML(RenderBody(body).c_str());
-	}
-
-	if (IS_URL("/dump/game-objects")) {
+	ADD_ROUTE(GameObjectRoute, "/dump/game-objects/?t={type:u8}") {
 		std::vector<fo::GameObject*> vec;
-		misc::FillListVector(misc::FLV::CRITTERS, vec);
+		rfall::misc::FLV type = ((GameObjectRoute*)ctx)->type;
+		misc::FillListVector(type, vec);
 
 		std::string response = std::string(HTMLStart);
 
@@ -457,9 +599,71 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
 			tr->add(HTMLElement::td(std::string(fo::func::art_get_name(obj->artFid))));
 			return tr;
 		};
+		body->add(HTMLUtils::URL("?t=0", type == rfall::misc::FLV::CRITTERS ? "[Critters]" : "Critters"));
+		body->add(HTMLUtils::URL("?t=1", type == rfall::misc::FLV::GROUNDITEMS ? "[Items]" : "Items"));
+		body->add(HTMLUtils::URL("?t=2", type == rfall::misc::FLV::SCENERY ? "[Scenery]" : "Scenery"));
+		body->add(HTMLUtils::URL("?t=3", type == rfall::misc::FLV::WALLS ? "[Walls]" : "Walls"));
+		body->add(HTMLUtils::URL("?t=4", type == rfall::misc::FLV::TILES ? "[Tiles]" : "Tiles"));
+		body->add(HTMLUtils::URL("?t=5", type == rfall::misc::FLV::MISC ? "[Misc]" : "Misc"));
+		body->add(HTMLUtils::URL("?t=6", type == rfall::misc::FLV::SPATIAL ? "[Spatial]" : "Spatial"));
+		body->add(HTMLUtils::URL("?t=9", type == rfall::misc::FLV::ALL ? "[All]" : "All"));
+		body->add(new HTMLElement(HTMLTag::br));
+		body->add(table->get());
+		return responseAllocHTML(RenderBody(body).c_str());
+	})));
+}
+
+struct Response* createResponseForRequest(const struct Request* request, struct Connection* connection) {
+	// RESERVED
+	// /db/*
+	auto body = new HTMLElement(HTMLTag::body);
+	auto d = (char*)request->pathDecoded;
+
+	if (IS_URL("/") || IS_URL("/style.css") || IS_URL("/script.js")) {
+		return DOC_ROOT;
+	}
+	// Resolve all routes
+	for (auto& route : routes) {
+		route->setContext(body, (char*)request->pathDecoded);
+		auto m = route->match();
+		if (m != NULL)
+			return m;
+	}
+
+	if (IS_URL("/files/scripts"))
+		return HTMLDisplayDBFiles("scripts\\*.int");
+
+	if (IS_URL("/files/maps")) {
+		body->add(HTMLDisplayMaps());
+		return responseAllocHTML(RenderBody(body).c_str());
+	}
+
+	if (IS_URL("/cheats/give-xp")) {
+		fo::func::stat_pc_add_experience(10000);
+		return DOC_INDEX;
+	}
+
+	if (IS_URL("/files/xfopen")) {
+		body->add(HTMLElement::p("These are all the files loaded via the xfopen function."));
+		std::vector<char*> keys;
+		for (auto& kvp : xfopened)
+			keys.push_back(kvp.first);
+
+		auto table = new HTMLTable<char*>();
+		table->width = 400;
+		table->headers = { "File", "Source" };
+		table->rowObjects = keys;
+		table->bodyFunc = [](char* key, int idx) -> HTMLElement* {
+			auto tr = HTMLElement::tr();
+			tr->add(HTMLElement::td(key));
+			tr->add(HTMLElement::td(xfopened[key]));
+			return tr;
+		};
 		body->add(table->get());
 		return responseAllocHTML(RenderBody(body).c_str());
 	}
+
+	
 	return responseAlloc404NotFoundHTML("You don't see anything out of the ordinary.");
 }
 
@@ -479,6 +683,7 @@ static void Run() {
 	xfopenLoadedFrom = (char*)malloc(200);
 	sfall::MakeCall(0x4DEFCD, xfopen_hook);
 	sfall::MainLoopHook::OnMainLoop() += OnMainLoop;
+	InitRoutes();
 	// Switching map in Combat crashes the game and from WM it doesn't work, 
 	// likely needs the use the "enter map from wm" function instead.
 	//sfall::MainLoopHook::OnCombatLoop() += OnCombatLoop;
