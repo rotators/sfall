@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <cstring>
 #include <iterator>
 #include <string>
 #include <unordered_map>
@@ -16,7 +17,35 @@ using namespace rfall;
 // Declared in Scripting/Handlers/Metarule.cpp
 namespace sfall { namespace script { extern std::unordered_map<std::string, const sfall::script::SfallMetarule*> metaruleTable; }}
 
-// pseudopcodes
+// Helpers
+
+static char* cstrdup(const char* str) {
+	size_t len = std::strlen(str);
+	char* dup = new char[len + 1];
+	if (!dup) // ?
+		return nullptr;
+	if (len)
+		memcpy(dup, str, len);
+	dup[len] = 0;
+
+	return dup;
+}
+
+// Pseudopcodes
+
+void op_tolower(sfall::script::OpcodeContext& ctx) {
+	auto str = std::string(ctx.arg(0).asString()); // sue me.
+	std::transform(str.begin(), str.end(), str.begin(), ::tolower);
+
+	ctx.setReturn(cstrdup(str.c_str()));
+}
+
+void op_toupper(sfall::script::OpcodeContext& ctx) {
+	auto str = std::string(ctx.arg(0).asString()); // sue me.
+	std::transform(str.begin(), str.end(), str.begin(), ::toupper);
+
+	ctx.setReturn(cstrdup(str.c_str()));
+}
 
 void op_rotators(sfall::script::OpcodeContext& ctx) {
 	ctx.setReturn("Rotators, rotate!");
@@ -25,7 +54,10 @@ void op_rotators(sfall::script::OpcodeContext& ctx) {
 // Module
 
 static const sfall::script::SfallMetarule metarules[] = {
-	{ "rotators", op_rotators, 0, 0 }
+	{ "r_tolower", op_tolower, 1, 1, -1, {sfall::script::ARG_STRING}},
+	{ "r_toupper", op_toupper, 1, 1, -1, {sfall::script::ARG_STRING}},
+
+	{ "rotators",  op_rotators, 0, 0 }
 };
 
 void sfall::Script::init() {
