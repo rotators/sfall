@@ -295,6 +295,9 @@
     <ClInclude Include="Modules\Rotators.LoadDll.h">
       <Filter>Modules</Filter>
     </ClInclude>
+    <ClInclude Include="Modules\Rotators.Script.h">
+      <Filter>Modules</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
@@ -548,6 +551,9 @@
       <Filter>Modules</Filter>
     </ClCompile>
     <ClCompile Include="Modules\Rotators.LoadDll.cpp">
+      <Filter>Modules</Filter>
+    </ClCompile>
+    <ClCompile Include="Modules\Rotators.Script.cpp">
       <Filter>Modules</Filter>
     </ClCompile>
   </ItemGroup>

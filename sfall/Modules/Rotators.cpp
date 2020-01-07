@@ -17,6 +17,7 @@
 #include "Rotators.HTTPD.h"
 #include "Rotators.LoadDll.h"
 #include "Rotators.Sandbox.h"
+#include "Rotators.Script.h"
 
 // Remember to wear protective goggles :)
 
@@ -197,13 +198,14 @@ int autoLoadAfter = 0x47CAE5;
 	}
 }*/
 
-void sfall::Rotators::init()
-{
+void sfall::Rotators::init() {
 	SafeWrite8(0x410003, 0xF4);
 
 	SubModules.add<HTTPD>();
 	SubModules.add<LoadDll>();
 	//SubModules.add<Sandbox>();
+
+	SubModules.add<Script>();
 
 	SubModules.initAll();
 }

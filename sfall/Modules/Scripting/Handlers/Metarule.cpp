@@ -45,7 +45,7 @@ namespace script
 
 typedef std::unordered_map<std::string, const SfallMetarule*> MetaruleTableType;
 
-static MetaruleTableType metaruleTable;
+/*upstream:static*/ MetaruleTableType metaruleTable;
 
 /*
 	Metarule AKA sfall_funcX.
