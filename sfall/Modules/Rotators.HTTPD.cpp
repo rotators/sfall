@@ -3,6 +3,8 @@
 #include <thread>
 #include <map>
 
+#include <fstream>
+
 #include "..\FalloutEngine\Fallout2.h"
 #include "..\SafeWrite.h"
 #include "..\Utils.h"
@@ -670,25 +672,45 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
 // Module
 
 static void Run() {
+	std::ofstream log;
+	log.open("rfall-httpd.txt", std::ios_base::out | std::ios_base::trunc);
+
+	log << "> config\n";
+	log.flush();
 	DocumentRoot = Ini::String("HTTPD", "DocumentRoot", ".");
 
+	log << "> serverInit\n";
+	log.flush();
 	serverInit(&server);
 
+	log << "> localhost\n";
+	log.flush();
 	struct sockaddr_in localhost = { 0 };
 	localhost.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 	localhost.sin_family = AF_INET;
 	localhost.sin_port = htons(sfall::HTTPD::Port); // maybe pass it as argument?
 
+	log << "> malloc\n";
+	log.flush();
 	xfopenLoadFile   = (char*)malloc(200);
 	xfopenLoadedFrom = (char*)malloc(200);
+	log << "> xfopen_hook\n";
+	log.flush();
 	sfall::MakeCall(0x4DEFCD, xfopen_hook);
+	log << "> OnMainLoop\n";
+	log.flush();
 	sfall::MainLoopHook::OnMainLoop() += OnMainLoop;
+	log << "> InitRoutes()\n";
+	log.flush();
 	InitRoutes();
+
 	// Switching map in Combat crashes the game and from WM it doesn't work, 
 	// likely needs the use the "enter map from wm" function instead.
 	//sfall::MainLoopHook::OnCombatLoop() += OnCombatLoop;
 	//sfall::Worldmap::OnWorldmapLoop() += OnWMLoop;
 
+	log << "> acceptConnectionsUntilStopped()\n";
+	log.flush();
 	acceptConnectionsUntilStopped(&server, (struct sockaddr*) & localhost, sizeof(localhost));
 }
 
