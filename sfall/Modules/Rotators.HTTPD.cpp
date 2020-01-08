@@ -1,4 +1,12 @@
 #include <cstdint>
+
+#include "Rotators.HTTPD.h"
+
+// Used by other submodules to check if HTTPD is currently enabled, so it must be declared for v140_xp build
+uint16_t sfall::HTTPD::Port = 0;
+
+#if _MSC_VER >= 1920
+
 #include <string>
 #include <thread>
 #include <map>
@@ -15,13 +23,11 @@
 #include "..\Lib\EmbeddableWebServer.h"
 
 #include "Rotators.h"
-#include "Rotators.HTTPD.h"
 
 using namespace rfall;
 
 static struct Server server;
 std::thread thread;
-uint16_t sfall::HTTPD::Port = 0;
 
 std::string DocumentRoot;
 
@@ -728,3 +734,5 @@ void sfall::HTTPD::exit() {
 		thread.join();
 	}
 }
+
+#endif // _MSC_VER >= 1920 //
