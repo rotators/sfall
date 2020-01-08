@@ -716,9 +716,9 @@ static void Run() {
 
 void sfall::HTTPD::init() {
 	// Cached in case value changes after init
-	Port = Ini::Int( "HTTPD", "Port", 1207);
+	Port = Ini::Int( "HTTPD", "Port", 0);
 
-	if (Port)
+	if (Port) // https://github.com/rotators/sfall/issues/2
 		thread = std::thread(Run);
 }
 
