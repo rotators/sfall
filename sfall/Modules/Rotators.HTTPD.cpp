@@ -13,9 +13,10 @@ uint16_t sfall::HTTPD::Port = 0;
 
 #include <fstream>
 
-#include "..\FalloutEngine\Fallout2.h"
+#include "..\main.h"
 #include "..\SafeWrite.h"
 #include "..\Utils.h"
+#include "..\FalloutEngine\Fallout2.h"
 
 #include "MainLoopHook.h"
 #include "WorldMap.h"
@@ -724,8 +725,17 @@ void sfall::HTTPD::init() {
 	// Cached in case value changes after init
 	Port = Ini::Int( "HTTPD", "Port", 0);
 
-	if (Port) // https://github.com/rotators/sfall/issues/2
+	if (Port) {
+		static const std::vector<uint16_t> banned = { 2049, 4045, 6000 };
+
+		if (Port <= 1024 || std::count(banned.begin(), banned.end(), Port))
+			misc::CriticalFail("[HTTPD]->Port " + std::to_string(Port) + " invalid");
+
+		dlog_f( "> starting on port %u\n", DL_INIT, Port);
+
+		// https://github.com/rotators/sfall/issues/2
 		thread = std::thread(Run);
+	}
 }
 
 void sfall::HTTPD::exit() {

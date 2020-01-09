@@ -7,6 +7,8 @@
 
 #include "Module.h"
 
+#define DLL_EXPORT extern "C" __declspec(dllexport)
+
 namespace fo
 {
 
@@ -66,7 +68,9 @@ struct misc {
 		ALL = 9
 	};
 
-	static void rfall::misc::FillListVector(FLV type, std::vector<fo::GameObject*>& vec, int8_t elevation = -1); // -2=all -1=current 0-2=specific
+	static void CriticalFail(const std::string& message);
+
+	static void FillListVector(FLV type, std::vector<fo::GameObject*>& vec, int8_t elevation = -1); // -2=all -1=current 0-2=specific
 };
 
 }

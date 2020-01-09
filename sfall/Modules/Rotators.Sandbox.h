@@ -1,3 +1,5 @@
+#if _MSC_VER >= 1920
+
 #pragma once
 
 #include <cstdint>
@@ -7,13 +9,13 @@
 namespace sfall
 {
 
-	class Sandbox : public Module {
-	public:
-		static uint16_t Port;
+class Sandbox : public Module {
+public:
+	const char* name() { return "Sandbox"; }
 
-	public:
-		const char* name() { return "Sandbox"; }
-		void init();
-	};
+	void init();
+};
 
 }
+
+#endif // _MSC_VER >= 1920 //

@@ -379,6 +379,7 @@
     <ClInclude Include="Modules\Rotators.h" />
     <ClInclude Include="Modules\Rotators.HTTPD.h" />
     <ClInclude Include="Modules\Rotators.LoadDll.h" />
+    <ClInclude Include="Modules\Rotators.Sandbox.h" />
     <ClInclude Include="Modules\Rotators.Script.h" />
   </ItemGroup>
   <ItemGroup>
@@ -471,6 +472,7 @@
     <ClCompile Include="Modules\Rotators.cpp" />
     <ClCompile Include="Modules\Rotators.HTTPD.cpp" />
     <ClCompile Include="Modules\Rotators.LoadDll.cpp" />
+    <ClCompile Include="Modules\Rotators.Sandbox.cpp" />
     <ClCompile Include="Modules\Rotators.Script.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

@@ -1,17 +1,9 @@
 #include <algorithm>
-#include <map>
 #include <string>
 #include <vector>
 
 #include "..\main.h"
-#include "..\SafeWrite.h"
-#include "..\Utils.h"
 #include "..\FalloutEngine\Fallout2.h"
-#include "MainLoopHook.h"
-#include "FileSystem.h"
-#include "LoadGameHook.h"
-
-#include "ScriptExtender.h"
 
 #include "Rotators.h"
 #include "Rotators.HTTPD.h"
@@ -19,7 +11,11 @@
 #include "Rotators.Sandbox.h"
 #include "Rotators.Script.h"
 
+//
 // Remember to wear protective goggles :)
+//
+
+// Submodules handling
 
 void rfall::SubModuleManager::initAll() {
 	for (const auto& module : _modules) {
@@ -104,6 +100,11 @@ void* rfall::db::fastread(char* filename)
 
 // Misc stuff
 
+void rfall::misc::CriticalFail(const std::string& message) {
+	MessageBoxA(0, message.c_str(), "Error", MB_TASKMODAL | MB_ICONERROR);
+	ExitProcess(1);
+}
+
 // Taken from sfall::script::FillListVector() Scripting/Handlers/Arrays.cpp
 void rfall::misc::FillListVector(FLV type, std::vector<fo::GameObject*>& vec, int8_t elevation /* = -1 */) {
 	// current
@@ -170,42 +171,16 @@ void rfall::misc::FillListVector(FLV type, std::vector<fo::GameObject*>& vec, in
 
 //
 
-extern void* LoadGameHookFuncAddress;
-int LoadScreenInit = 0x480AF5;
-static void MainHook() { }
-int LoadSlot;
-static __declspec(naked) void LoadScreenInitHook() {
-	LoadSlot = rfall::Ini::Int("Debugging", "AutoLoadSlot", -1);
-	if (LoadSlot != -1) {
-		__asm {
-			jmp LoadScreenInit
-		}
-	}
-}
-
-int autoLoadAfter = 0x47CAE5;
-// Not totally working, need to change "destination screen" somewhere.
-/*static __declspec(naked) void AutoLoadSave() {
-	LoadSlot = Ini::Int("Debugging", "AutoLoadSlot", -1);
-	if (LoadSlot != -1) {
-		fo::var::slot_cursor = LoadSlot;
-		__asm {
-			mov eax, fo::var::slot_cursor
-			call fo::funcoffs::LoadSlot_
-			//call fo::funcoffs::getInput_
-			//jmp autoLoadAfter
-		}
-	}
-}*/
-
 void sfall::Rotators::init() {
 	SafeWrite8(0x410003, 0xF4);
 
-	SubModules.add<HTTPD>();
+	SubModules.add<HTTPD>(); // dummy on v140_xp
 	SubModules.add<LoadDll>();
-	//SubModules.add<Sandbox>();
-
 	SubModules.add<Script>();
+
+	#if _MSC_VER >= 1920
+	SubModules.add<Sandbox>();
+	#endif
 
 	SubModules.initAll();
 }

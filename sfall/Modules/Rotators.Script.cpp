@@ -54,25 +54,57 @@ void op_rotators(sfall::script::OpcodeContext& ctx) {
 // Module
 
 static const sfall::script::SfallMetarule metarules[] = {
-	{ "r_tolower", op_tolower, 1, 1, -1, {sfall::script::ARG_STRING}},
-	{ "r_toupper", op_toupper, 1, 1, -1, {sfall::script::ARG_STRING}},
+	{ "r_tolower", op_tolower, 1, 1, -1, {sfall::script::ARG_STRING} },
+	{ "r_toupper", op_toupper, 1, 1, -1, {sfall::script::ARG_STRING} },
 
 	{ "rotators",  op_rotators, 0, 0 }
 };
 
 void sfall::Script::init() {
 	for (auto metarule = std::begin(metarules); metarule != std::end(metarules); ++metarule) {
+		if (sfall::script::metaruleTable.find(metarule->name) != sfall::script::metaruleTable.end())
+			misc::CriticalFail( "Metarule name collision: " + std::string(metarule->name));
+
 		std::string name, args;
 		if (metarule->minArgs == metarule->maxArgs)
 			name = std::to_string(metarule->minArgs);
-		else
+		else // disallow?
 			name = "[" + std::to_string(metarule->minArgs) + "-" + std::to_string(metarule->maxArgs) + "]";
 
-		if (metarule->minArgs > 0)
-			args = ", ..."; // TODO
+		for (uint8_t arg = 0; arg < metarule->maxArgs; arg++) {
+			args += ", ";
 
-		sfall::dlog_f("sfall_func%s(\"%s\"%s)\n", DL_INIT, name.c_str(), metarule->name, args.c_str() );
+			if (arg + 1 > metarule->minArgs)
+				args += "[";
 
+			switch (metarule->argValidation[arg]) {
+				case sfall::script::ARG_ANY:
+					args += "ARG_ANY";
+					break;
+				case sfall::script::ARG_INT:
+					args += "ARG_INT";
+					break;
+				case sfall::script::ARG_OBJECT:
+					args += "ARG_OBJECT";
+					break;
+				case sfall::script::ARG_STRING:
+					args += "ARG_STRING";
+					break;
+				case sfall::script::ARG_INTSTR:
+					args += "ARG_INTSTR";
+					break;
+				case sfall::script::ARG_NUMBER:
+					args += "ARG_NUMBER";
+					break;
+				default:
+					args += "<" + std::to_string(metarule->argValidation[arg]) + ">";
+					break;
+			}
+			if (arg + 1 > metarule->minArgs)
+				args += "]";
+		}
+
+		sfall::dlog_f("> sfall_func%s(\"%s\"%s)\n", DL_INIT, name.c_str(), metarule->name, args.c_str() );
 		sfall::script::metaruleTable[metarule->name] = metarule;
 	}
 }

@@ -1,25 +1,38 @@
+#if _MSC_VER >= 1920
+
+#include <algorithm>
 #include <string>
 #include <vector>
 
 #include "..\main.h"
 #include "..\SafeWrite.h"
 #include "..\Utils.h"
-#include "..\FalloutEngine\Fallout2.h"
 
-#include "Rotators.Sandbox.h"
+#include "..\FalloutEngine\Fallout2.h"
+#include "..\FalloutEngine\EngineUtils.h"
+
+#include "Filesystem.h"
+#include "LoadGameHook.h"
+#include "MainLoopHook.h"
+
 #include "Rotators.h"
+#include "Rotators.Sandbox.h"
+
 using namespace rfall;
 
 namespace sfall
 {
 
-	// FUNC(xenumfiles_, 0x4DFB3C)
-	// Function for enumerating files in filesystem and loaded DAT files based on a searchstring.
-	// Not sure if this is helpful or just a waste of time... this should be rewritten in c++.
-	// searchstring can be: "PROTO\\CRITTERS\\*.PRO" for example.
-	// eax = searchstring
-	// edx = buffer for storing the result
-	// xenum_files(char* searchstring, void* result);
+//
+// FUNC(xenumfiles_, 0x4DFB3C)
+// Function for enumerating files in filesystem and loaded DAT files based on a searchstring.
+// Not sure if this is helpful or just a waste of time... this should be rewritten in c++.
+// searchstring can be: "PROTO\\CRITTERS\\*.PRO" for example.
+// eax = searchstring
+// edx = buffer for storing the result
+// xenum_files(char* searchstring, void* result);
+//
+
 	static void _declspec(naked) _xenum_files()
 	{
 		__asm {
@@ -306,9 +319,79 @@ namespace sfall
 		return result;
 	}
 
-	void Sandbox::init() { 
+//
+// Automagically load savegame on game start
+//
+
+	extern void* LoadGameHookFuncAddress;
+	int LoadScreenInit = 0x480AF5;
+	static void MainHook() { }
+	int LoadSlot;
+	static __declspec(naked) void LoadScreenInitHook() {
+		LoadSlot = rfall::Ini::Int("Debugging", "AutoLoadSlot", -1);
+		if (LoadSlot != -1) {
+			__asm {
+				jmp LoadScreenInit
+			}
+		}
+	}
+
+	int autoLoadAfter = 0x47CAE5;
+	// Not totally working, need to change "destination screen" somewhere.
+	/*static __declspec(naked) void AutoLoadSave() {
+	LoadSlot = Ini::Int("Debugging", "AutoLoadSlot", -1);
+	if (LoadSlot != -1) {
+		fo::var::slot_cursor = LoadSlot;
+		__asm {
+			mov eax, fo::var::slot_cursor
+			call fo::funcoffs::LoadSlot_
+			//call fo::funcoffs::getInput_
+			//jmp autoLoadAfter
+		}
+	}
+}*/
+
+//
+// Draw directly on screen
+//
+// MainLoopHook::OnMainLoop() is (obviously) a wrong place for the job and gives bad results; it's either called too rarely or too often
+// https://i.imgur.com/T3Q1ncf.png
+// https://i.imgur.com/YyeEFZ0.png
+//
+
+	static void DrawOnDisplayWin()
+	{
+		char* test = "TEST? TEST! TEST~";
+		DWORD w = fo::GetTextWidth(test);
+
+		fo::Window* win = fo::func::GNW_find(*(DWORD*)FO_VAR_display_win);
+		fo::PrintText(test, 134, 100, 100, w, win->width, win->surface);
+	}
+
+//
+// Module
+//
+
+	void Sandbox::init()
+	{
+		if (Ini::Int("Debugging", "Sandbox", 0) <= 0)
+			return;
+
+		dlogr("> remember to wear protective goggles", DL_INIT);
+
+		// xenum_files
+
 		sfall::MakeCall(0x4DFF33, _xenum_files);
+
+		// autoload
+
 		//sfall::MakeJump(0x480A23, LoadScreenInitHook);
+
+		// display_win draw
+
+		MainLoopHook::OnMainLoop() += DrawOnDisplayWin;
 	}
 
 }
+
+#endif // _MSC_VER >= 1920 //
