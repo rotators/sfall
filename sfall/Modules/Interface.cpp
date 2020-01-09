@@ -491,17 +491,34 @@ static long dotLen = 1;
 static long dot_xpos = 0;
 static long dot_ypos = 0;
 
+static bool Fo1Behavior = false;
+
 static void AddNewDot() {
 	dot_xpos = fo::var::world_xpos;
 	dot_ypos = fo::var::world_ypos;
 
+	long* terrainId = *(long**)FO_VAR_world_subtile;
+
 	if (dotLen <= 0 && spaceLen) {
 		spaceLen--;
-		if (!spaceLen) dotLen = optionLenDot; // set dot length
+		if (!spaceLen) {
+			if (Fo1Behavior && (*terrainId == 1)) {
+				dotLen = optionLenDot + 1; // If Mountain terrain, increase the dot length
+			}
+			else {
+				dotLen = optionLenDot;
+			};
+		};
 		return;
 	}
 	dotLen--;
-	spaceLen = optionSpaceDot;
+
+	if (Fo1Behavior && (*terrainId != 1)) { 
+		spaceLen = optionSpaceDot + 1; // If not Mountain terrain, increase the spacing
+	}
+	else { 
+		spaceLen = optionSpaceDot; 
+	};
 
 	dots.emplace_back(dot_xpos, dot_ypos);
 }
@@ -713,6 +730,10 @@ static void WorldMapInterfacePatch() {
 		dlogr(" Done", DL_INIT);
 	}
 	if (showTravelMarkers || showTerrainType) HookCall(0x4C3C7E, wmInterfaceRefresh_hook); // when calling wmDrawCursorStopped_
+
+	if (GetConfigInt("Misc", "Fallout1Behavior", 0)) {
+		Fo1Behavior = true;
+	}
 
 	// Car fuel gauge graphics patch
 	MakeCall(0x4C528A, wmInterfaceRefreshCarFuel_hack_empty);
