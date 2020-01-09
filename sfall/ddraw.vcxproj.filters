@@ -16,6 +16,9 @@
     <Filter Include="Modules\HookScripts">
       <UniqueIdentifier>{1e66856c-4830-4ca0-a998-15b697208223}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Modules\HTTP">
+      <UniqueIdentifier>{3f1c1da5-7dfb-4310-9012-385717d579b6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="main.h" />
@@ -301,6 +304,12 @@
     <ClInclude Include="Modules\Rotators.Sandbox.h">
       <Filter>Modules</Filter>
     </ClInclude>
+    <ClInclude Include="Modules\HTTP\HTML.h">
+      <Filter>Modules\HTTP</Filter>
+    </ClInclude>
+    <ClInclude Include="Modules\HTTP\Routing.h">
+      <Filter>Modules\HTTP</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
@@ -561,6 +570,12 @@
     </ClCompile>
     <ClCompile Include="Modules\Rotators.Script.cpp">
       <Filter>Modules</Filter>
+    </ClCompile>
+    <ClCompile Include="Modules\HTTP\HTML.cpp">
+      <Filter>Modules\HTTP</Filter>
+    </ClCompile>
+    <ClCompile Include="Modules\HTTP\Routing.cpp">
+      <Filter>Modules\HTTP</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
