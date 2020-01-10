@@ -121,18 +121,19 @@ namespace rfall {
 		return true;
 	}
 
-	void Router::setContext(char* path, HTMLElement* root) {
+	void Router::setContext(char* path, HTMLElement* root, HTMLElement* title) {
 		this->path = path;
 		this->root = root;
+		this->title = title;
 	}
 	
 	bool Router::exactly(std::string url) {
 		return url.compare(this->path)==0;
 	}
 
-	void Router::on(std::string _template, std::function<void(HTMLElement*, std::map<std::string, std::string>)> handler) {
+	void Router::on(std::string _template, std::function<void(HTMLElement*, HTMLElement *, std::map<std::string, std::string>)> handler) {
 		if (this->matchTemplate(this->path, _template))
-			handler(this->root, this->variables);
+			handler(this->root, this->title, this->variables);
 	};
 
 

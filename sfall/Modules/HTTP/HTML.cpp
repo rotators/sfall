@@ -2,8 +2,7 @@
 #include <cstdint>
 
 namespace rfall {
-	// Start indentation to be under <body>
-	uint8_t HTMLIdentation = 2;
+	uint8_t HTMLIdentation = 0;
 
 	// https://developer.mozilla.org/en-US/docs/Web/HTML/Element
 	HTMLElement::~HTMLElement() {
@@ -16,9 +15,15 @@ namespace rfall {
 		this->tag = tag;
 	}
 
-	HTMLElement::HTMLElement(HTMLTag tag, std::string innerHTML) {
+	HTMLElement::HTMLElement(HTMLTag tag, std::string text) {
 		this->tag = tag;
-		this->innerHTML = innerHTML;
+		this->text = text;
+	}
+
+	// Short method to add child
+	HTMLElement* HTMLElement::_(HTMLElement* child) {
+		this->add(child);
+		return this;
 	}
 
 	HTMLElement* HTMLElement::add(HTMLElement* child) {
@@ -26,19 +31,34 @@ namespace rfall {
 		return this;
 	}
 
+	#define t(_a) case HTMLTag::_a:     return #_a;
 	std::string HTMLElement::getTagStr() {
 		switch (tag) {
-		case HTMLTag::a:     return "a";
-		case HTMLTag::br:    return "br";
-		case HTMLTag::div_:  return "div";
-		case HTMLTag::body:  return "body";
-		case HTMLTag::td:    return "td";
-		case HTMLTag::tr:    return "tr";
-		case HTMLTag::th:    return "th";
-		case HTMLTag::table: return "table";
-		case HTMLTag::tbody: return "tbody";
-		case HTMLTag::thead: return "thead";
-		case HTMLTag::p:     return "p";
+			t(a)
+			t(br)
+			t(div)
+			t(body)
+			t(html)
+			t(h1)
+			t(h2)
+			t(h3)
+			t(h4)
+			t(h5)
+			t(h6)
+			t(head)
+			t(link)
+			t(td)
+			t(tr)
+			t(th)
+			t(table)
+			t(tbody)
+			t(thead)
+			t(title)
+			t(span)
+			t(ol)
+			t(ul)
+			t(li)
+			t(p)
 		default: throw "invalid tag";
 		}
 	}
@@ -46,6 +66,7 @@ namespace rfall {
 	bool HTMLElement::selfClosing() {
 		switch (tag) {
 		case HTMLTag::br: return true;
+		case HTMLTag::link: return true;
 		default: return false;
 		}
 	}
@@ -61,19 +82,15 @@ namespace rfall {
 
 		buf += '<';
 		buf += tag;
-		if (attributes.size() > 0)
-			buf += ' ';
 
 		bool first = true;
 		for (auto attr : attributes) {
+			buf += ' ';
 			buf += attr.first;
 			buf += '=';
 			buf += '"';
 			buf += attr.second;
 			buf += '"';
-			if (!first) {
-				buf += ' ';
-			}
 			first = false;
 		}
 		if (selfClosing()) {
@@ -88,7 +105,7 @@ namespace rfall {
 			buf += ch->render();
 		}
 		HTMLIdentation--;
-		buf += innerHTML;
+		buf += text;
 		if (children.size() != 0) {
 			buf += '\n';
 			for (auto i = 0; i < HTMLIdentation; i++) {
@@ -101,23 +118,33 @@ namespace rfall {
 		return buf;
 	}
 
-	HTMLElement* HTMLElement::a(std::string innerHTML) { return new HTMLElement(HTMLTag::a, innerHTML); }
-	HTMLElement* HTMLElement::div() { return new HTMLElement(HTMLTag::div_); }
-	HTMLElement* HTMLElement::body() { return new HTMLElement(HTMLTag::body); }
-	HTMLElement* HTMLElement::tbody() { return new HTMLElement(HTMLTag::tbody); }
-	HTMLElement* HTMLElement::tbody(std::string innerHTML) { return new HTMLElement(HTMLTag::tbody, innerHTML); }
-	HTMLElement* HTMLElement::thead() { return new HTMLElement(HTMLTag::thead); }
-	HTMLElement* HTMLElement::td(std::string innerHTML) { return new HTMLElement(HTMLTag::td, innerHTML); }
-	HTMLElement* HTMLElement::td() { return new HTMLElement(HTMLTag::td); }
-	HTMLElement* HTMLElement::th(std::string innerHTML) { return new HTMLElement(HTMLTag::th, innerHTML); }
-	HTMLElement* HTMLElement::tr() { return new HTMLElement(HTMLTag::tr); }
-	HTMLElement* HTMLElement::p() { return new HTMLElement(HTMLTag::p); }
-	HTMLElement* HTMLElement::p(std::string innerHTML) { return new HTMLElement(HTMLTag::p, innerHTML); }
+	#define d(_e) HTMLElement* HTMLElement::##_e##()
+	#define dt(_e) HTMLElement* HTMLElement::##_e##(std::string text)
+	#define c(_e) { return new HTMLElement(HTMLTag::_e); }
+	#define ct(_e) { return new HTMLElement(HTMLTag::_e, text); }
+	#define dc(_e) d(_e) c(_e)    // Tag with no text element
+	#define dtc(_e) dt(_e) ct(_e) // Tag with text element constructor
+	#define b(_e) dc(_e) dtc(_e)  // Tag with both
+
+	b(h1); b(h2); b(h3); b(h4); b(h5); b(h6);
+	b(td)
+	b(p)
+	dc(head) dc(body)
+	dc(div)
+	dc(br)
+	dc(tbody)
+	dc(tr)
+	dc(ul)
+	dc(li)
+	dtc(a)
+	dtc(th)
+	dtc(span)
+	dtc(title)
 
 	HTMLElement* HTMLTable::createHeader() {
 		auto thead = new HTMLElement(HTMLTag::thead);
 		auto tr = HTMLElement::tr();
-		thead->children.push_back(tr);
+		thead->children.push_back((tr));
 		for (auto const& text : headers)
 			tr->children.push_back(HTMLElement::th(text));
 		return thead;
@@ -137,6 +164,13 @@ namespace rfall {
 		return table;
 	}
 
+	HTMLElement* HTMLUtils::CSS(std::string href) {
+		auto l = new HTMLElement(HTMLTag::link);
+		l->attributes["href"] = href;
+		l->attributes["rel"] = "stylesheet";
+		l->attributes["type"] = "text/css";
+		return l;
+	}
 	HTMLElement* HTMLUtils::URL(std::string href, std::string text) {
 		auto a = HTMLElement::a(text);
 		a->attributes["href"] = href;

@@ -43,19 +43,6 @@ int _rewind = 0x004F1411;
 std::map<char*, char*> xfopened;
 bool alreadyHasKey = false;
 
-//
-
-char* HTMLStart = R"HTML_S(
-	<!DOCTYPE html>
-	<html>
-	<head>
-		<title>sfall UI</title>
-		<link rel="stylesheet" href="/style.css" type="text/css" />
-	</head>)HTML_S";
-
-char* HTMLEnd = R"HTML_S(
-</html>)HTML_S";
-
 static void loadmap() {
 	__asm {
 		pushad
@@ -148,20 +135,21 @@ bool DoesFileExist(const char* filename) {
 	return result == 0;
 }
 
-Response* HTMLDisplayDBFiles(char* pattern) {
+#define h(__type) HTMLElement::__type()
+#define h(__type, __arg1) HTMLElement::__type(__arg1)
+#define _s(__arg) std::to_string(__arg)
+#define _url(href, text) HTMLUtils::URL(href, text)
+
+void HTMLDisplayDBFiles(char* pattern, HTMLElement* parent) {
 	char** filenames;
 
 	int count = fo::func::db_get_file_list(pattern, &filenames);
-	std::string response = std::string(HTMLStart);
 
 	for (auto i = 0; i < count; i++) {
-		response += std::string(filenames[i]);
-		response += "<br/>\n";
+		parent->_(h(span, std::string(filenames[i])));
+		parent->_(h(br));
 	}
-
 	fo::func::db_free_file_list(&filenames, 0);
-	response += HTMLEnd;
-	return responseAllocHTML(response.c_str());
 }
 
 HTMLElement* HTMLDisplayMaps() {
@@ -172,8 +160,7 @@ HTMLElement* HTMLDisplayMaps() {
 	for (int i = 0; i < fo::var::wmMaxMapNum; i++) {
 		maps.push_back(mapsInfo[i]);
 	}
-	std::string response = std::string(HTMLStart);
-	div->add(HTMLElement::p("These are all from Maps.txt"));
+	div->add(h(p, "These are all from Maps.txt"));
 	auto table = new HTMLTable();
 	table->width = 400;
 	table->headers = { "Id", "Name", "Music", "Teleport" };
@@ -181,65 +168,87 @@ HTMLElement* HTMLDisplayMaps() {
 	int idx = 0;
 	for (auto& map : maps) {
 		auto href = std::string("/loadmap/");
-		href += std::to_string(idx);
-		auto tr = HTMLElement::tr();
-		tr->add(HTMLElement::td(std::to_string(idx++)));
-		tr->add(HTMLElement::td(map.mapName));
-		tr->add(HTMLElement::td(map.music));
-		tr->add(HTMLElement::td()->add(HTMLUtils::URL(href, "Teleport")));
-		tbody->add(tr);
+		href += _s(idx);
+		auto tr = h(tr);
+		tr->_(h(td, _s(idx++)));
+		tr->_(h(td, map.mapName));
+		tr->_(h(td, map.music));
+		tr->_(h(td)->_(HTMLUtils::URL(href, "Teleport")));
+		tbody->_(tr);
 	}
 
-	div->add(table->get());
+	div->_(table->get());
 	return div;
 }
 
+Router* router;
+#define DOC_ROOT responseAllocServeFileFromRequestPath("/", request->path, request->pathDecoded, DocumentRoot.c_str())
+#define DOC_INDEX renderIndex(body); html->_(body); title->text = "sfall"; return renderHtml(html);
 
-
-
-std::string RenderBody(HTMLElement* body) {
-	std::string response = std::string(HTMLStart);
-	response += body->render();
-	response += HTMLEnd;
-	delete body;
-	return response;
+Response* renderHtml(HTMLElement* h) {
+	auto r = responseAllocHTML(h->render().c_str());
+	delete h;
+	return r;
 }
 
-Router* router;
-
-#define IS_URL(__path) 0 == strcmp(request->pathDecoded, __path)
-#define DOC_ROOT responseAllocServeFileFromRequestPath("/", request->path, request->pathDecoded, DocumentRoot.c_str())
-#define DOC_INDEX responseAllocServeFileFromRequestPath("/", "/index.html", "/index.html", DocumentRoot.c_str())
-void InitRoutes() {
-	router = new Router();
+void renderIndex(HTMLElement* body) {
+	body->_(h(h1, "Database files"));
+	auto ul = h(ul);
+	ul->_(h(li)->_(_url("/files/scripts", "Loaded scripts")))
+	  ->_(h(li)->_(_url("/files/maps", "Loaded maps")))
+	  ->_(h(li)->_(_url("/files/xfopen", "XFOpened files")));
+	body->_(ul);
+	body->_(h(h1, "Game state"));
+	ul = h(ul);
+	ul->_(h(li)->_(_url("/dump/game-objects/?t=0", "Game objects")));
+	body->_(ul);
+	body->_(h(h1, "Cheats"));
+	ul = h(ul);
+	ul->_(h(li)->_(_url("/cheats/give-xp", "Gain 10 000 XP")));
+	body->_(ul);
 }
 
 struct Response* createResponseForRequest(const struct Request* request, struct Connection* connection) {
 	// RESERVED
 	// /db/*
+	auto html = new HTMLElement(HTMLTag::html);
+	auto head = HTMLElement::head();
+	auto title = HTMLElement::title("sfall UI");
+	head->add(title);
+	head->add(HTMLUtils::CSS("/style.css"));
+	html->add(head);
+
 	auto r = router;
 	auto body = HTMLElement::body();
-	r->setContext((char*)request->pathDecoded, body);
+	r->setContext((char*)request->pathDecoded, body, title);
 	
 	#define is(__a) r->exactly(__a)
 
-	if (is("/") || is("/style.css") || is("/script.js")) {
+	if (is("/")) {
+		DOC_INDEX;
+	}
+
+	if (is("/style.css") || is("/script.js")) {
 		return DOC_ROOT;
 	}
 
-	if (is("/files/scripts"))
-		return HTMLDisplayDBFiles("scripts\\*.int");
+	if (is("/files/scripts")) {
+		HTMLDisplayDBFiles("scripts\\*.int", body);
+		title->text = "sfall - loaded scripts";
+	}
 
 	if (is("/files/maps")) {
 		body->add(HTMLDisplayMaps());
+		title->text = "sfall - loaded maps";
 	}
 
 	if (is("/cheats/give-xp")) {
 		fo::func::stat_pc_add_experience(10000);
-		return DOC_INDEX;
+		DOC_INDEX;
 	}
 
 	if (is("/files/xfopen")) {
+		title->text = "sfall - xfopened files";
 		body->add(HTMLElement::p("These are all the files loaded via the xfopen function."));
 		std::vector<char*> keys;
 		for (auto& kvp : xfopened)
@@ -251,27 +260,26 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
 		auto tbody = table->createBody();
 		for (auto& kvp : xfopened) {
 			auto tr = HTMLElement::tr();
-			tr->add(HTMLElement::td(kvp.first));
-			tr->add(HTMLElement::td(kvp.second));
+			tr->_(h(td, kvp.first));
+			tr->_(h(td, kvp.second));
 			tbody->add(tr);
 		};
 		body->add(table->get());
 	}
 
 	typedef std::map<std::string, std::string> urlVars;
-	#define _ [] (HTMLElement* body, urlVars vars) -> void
+	#define __ [] (HTMLElement* body, HTMLElement* title, urlVars vars) -> void
 
-	r->on("/loadmap/{id:u8}", _ {
+	r->on("/loadmap/{id:u8}", __ {
 		mapIdToLoad = std::stoi(vars["id"]);
 		body->add(HTMLDisplayMaps());
 	});
 
-	r->on("/dump/game-objects/?t={type:u8}", _ {
+	r->on("/dump/game-objects/?t={type:u8}", __ {
+		title->text = "sfall - game objects";
 		std::vector<fo::GameObject*> vec;
 		rfall::misc::FLV type = (rfall::misc::FLV)std::stoi(vars["type"]);
 		misc::FillListVector(type, vec);
-
-		std::string response = std::string(HTMLStart);
 
 		auto table = new HTMLTable();
 		auto tbody = table->createBody();
@@ -280,9 +288,9 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
 		
 		for (auto& obj : vec) {
 			auto tr = HTMLElement::tr();
-			tr->add(HTMLElement::td(std::to_string(obj->id)));
-			tr->add(HTMLElement::td(std::to_string(obj->protoId)));
-			tr->add(HTMLElement::td(std::to_string(obj->scriptId)));
+			tr->_(h(td, _s(obj->id)));
+			tr->_(h(td, _s(obj->protoId)));
+			tr->_(h(td, _s(obj->scriptId)));
 			auto scriptData = std::string();
 			fo::ScriptInstance* script;
 			if (fo::func::scr_ptr(obj->scriptId, &script) != -1 && script->program != nullptr) {
@@ -301,36 +309,38 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
 			}
 			else
 				scriptData += "nullptr";
-			tr->add(HTMLElement::td(scriptData));
-			tr->add(HTMLElement::td(std::to_string(obj->x)));
-			tr->add(HTMLElement::td(std::to_string(obj->y)));
-			tr->add(HTMLElement::td(std::to_string(obj->sx)));
-			tr->add(HTMLElement::td(std::to_string(obj->sy)));
-			tr->add(HTMLElement::td(std::to_string(obj->rotation)));
-			tr->add(HTMLElement::td(std::to_string(obj->frm)));
-			tr->add(HTMLElement::td(std::to_string(obj->artFid)));
-			tr->add(HTMLElement::td(std::string(fo::func::art_get_name(obj->artFid))));
-			tbody->add(tr);
+			tr->_(h(td, scriptData))
+			  ->_(h(td, _s(obj->x)))
+			  ->_(h(td, _s(obj->y)))
+			  ->_(h(td, _s(obj->sx)))
+			  ->_(h(td, _s(obj->sy)))
+			  ->_(h(td, _s(obj->rotation)))
+			  ->_(h(td, _s(obj->frm)))
+			  ->_(h(td, _s(obj->artFid)))
+			  ->_(h(td, std::string(fo::func::art_get_name(obj->artFid))));
+			tbody->_(tr);
 		};
-		body->add(HTMLUtils::URL("?t=0", type == rfall::misc::FLV::CRITTERS ? "[Critters]" : "Critters"));
-		body->add(HTMLUtils::URL("?t=1", type == rfall::misc::FLV::GROUNDITEMS ? "[Items]" : "Items"));
-		body->add(HTMLUtils::URL("?t=2", type == rfall::misc::FLV::SCENERY ? "[Scenery]" : "Scenery"));
-		body->add(HTMLUtils::URL("?t=3", type == rfall::misc::FLV::WALLS ? "[Walls]" : "Walls"));
-		body->add(HTMLUtils::URL("?t=4", type == rfall::misc::FLV::TILES ? "[Tiles]" : "Tiles"));
-		body->add(HTMLUtils::URL("?t=5", type == rfall::misc::FLV::MISC ? "[Misc]" : "Misc"));
-		body->add(HTMLUtils::URL("?t=6", type == rfall::misc::FLV::SPATIAL ? "[Spatial]" : "Spatial"));
-		body->add(HTMLUtils::URL("?t=9", type == rfall::misc::FLV::ALL ? "[All]" : "All"));
-		body->add(new HTMLElement(HTMLTag::br));
-		body->add(table->get());
+		body->_(_url("?t=0", type == rfall::misc::FLV::CRITTERS ? "[Critters]" : "Critters"));
+		body->_(_url("?t=1", type == rfall::misc::FLV::GROUNDITEMS ? "[Items]" : "Items"));
+		body->_(_url("?t=2", type == rfall::misc::FLV::SCENERY ? "[Scenery]" : "Scenery"));
+		body->_(_url("?t=3", type == rfall::misc::FLV::WALLS ? "[Walls]" : "Walls"));
+		body->_(_url("?t=4", type == rfall::misc::FLV::TILES ? "[Tiles]" : "Tiles"));
+		body->_(_url("?t=5", type == rfall::misc::FLV::MISC ? "[Misc]" : "Misc"));
+		body->_(_url("?t=6", type == rfall::misc::FLV::SPATIAL ? "[Spatial]" : "Spatial"));
+		body->_(_url("?t=9", type == rfall::misc::FLV::ALL ? "[All]" : "All"));
+		body->_(h(br));
+		body->_(table->get());
 	});
 
+	#undef h
 	#undef _
 	#undef is
 
 	if (body->children.size() != 0) {
-		return responseAllocHTML(RenderBody(body).c_str());
+		html->add(body);
+		return renderHtml(html);
 	}
-
+	delete html;
 	return responseAlloc404NotFoundHTML("You don't see anything out of the ordinary.");
 }
 
@@ -367,7 +377,7 @@ static void Run() {
 	sfall::MainLoopHook::OnMainLoop() += OnMainLoop;
 	log << "> InitRoutes()\n";
 	log.flush();
-	InitRoutes();
+	router = new Router();
 
 	// Switching map in Combat crashes the game and from WM it doesn't work, 
 	// likely needs the use the "enter map from wm" function instead.
