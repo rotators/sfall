@@ -70,6 +70,12 @@ jobs:
     run:   |
            :
            echo "@echo off" > sfall/PostBuild.cmd
+
+           # "Temporary" workaround until VS2017 is (re)added to GHA
+           if [ "${{ matrix.cfg.toolset }}" == "v142" ]; then
+              sed -ri 's!<EnableEnhancedInstructionSet>NoExtensions</EnableEnhancedInstructionSet>!<EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>!' sfall/ddraw.vcxproj
+           fi
+
            if [ "${{ matrix.cfg.allow-fail }}" == "true" ]; then
               # (Try to) build solution as intended, but prevent it from failing the job
 
@@ -80,12 +86,6 @@ jobs:
                  echo ::set-env name=GHA_BUILD::OK
               fi
            else
-              # Temporary workaround until VS2017 is (re)added to GHA
-
-              if [ "${{ matrix.cfg.toolset }}" == "v142" ]; then
-                 sed -ri 's!<EnableEnhancedInstructionSet>NoExtensions</EnableEnhancedInstructionSet>!<EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>!' sfall/ddraw.vcxproj
-              fi
-
               "$($HOME/cache/vswhere.exe -latest -requires Microsoft.Component.MSBuild -find MSBuild/**/Bin/MSBuild.exe)" sfall/ddraw.sln -p:Configuration=${{ matrix.cfg.configuration }} -p:Platform=Win32 -p:PlatformToolset=${{ matrix.cfg.toolset }}
               echo ::set-env name=GHA_BUILD::OK
            fi
