@@ -14,9 +14,9 @@ jobs:
    fail-fast: false
    matrix:
     cfg:
-    - { toolset: v140_xp, configuration: ReleaseXP }
-    - { toolset: v142,    configuration: ReleaseXP }
-    - { toolset: v142,    configuration: Debug }
+    - { toolset: v140_xp, configuration: ReleaseXP, allow-fail: true }
+    - { toolset: v142,    configuration: ReleaseXP, allow-fail: nope }
+    - { toolset: v142,    configuration: Debug,     allow-fail: true }
   steps:
 
   - name:  Config
@@ -70,11 +70,11 @@ jobs:
     run:   |
            :
            echo "@echo off" > sfall/PostBuild.cmd
-           if [ "${{ matrix.cfg.toolset }}" == "v140_xp" ] || [ "${{ matrix.cfg.configuration }}" == "Debug" ]; then
+           if [ "${{ matrix.cfg.allow-fail }}" == "true" ]; then
               # (Try to) build solution as intended, but prevent it from failing the job
 
               ok=1
-              "$($HOME/cache/vswhere.exe -latest -requires Microsoft.Component.MSBuild -find MSBuild/**/Bin/MSBuild.exe)" sfall/ddraw.sln -p:Configuration=${{ matrix.cfg.configuration }} -p:Platform=Win32 || ok=0
+              "$($HOME/cache/vswhere.exe -latest -requires Microsoft.Component.MSBuild -find MSBuild/**/Bin/MSBuild.exe)" sfall/ddraw.sln -p:Configuration=${{ matrix.cfg.configuration }} -p:Platform=Win32 -p:PlatformToolset=${{ matrix.cfg.toolset }}|| ok=0
 
               if [ $ok -eq 1 ]; then
                  echo ::set-env name=GHA_BUILD::OK
