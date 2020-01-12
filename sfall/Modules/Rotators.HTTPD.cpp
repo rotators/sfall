@@ -352,7 +352,7 @@ static void Run() {
 
 	log << "> config\n";
 	log.flush();
-	DocumentRoot = Ini::String("HTTPD", "DocumentRoot", ".");
+	DocumentRoot = ini.GetStr("HTTPD", "DocumentRoot", ".");
 
 	log << "> serverInit\n";
 	log.flush();
@@ -391,7 +391,7 @@ static void Run() {
 
 void sfall::HTTPD::init() {
 	// Cached in case value changes after init
-	Port = Ini::Int( "HTTPD", "Port", 0);
+	Port = ini.GetInt("HTTPD", "Port", 0);
 	if (Port) {
 		static const std::vector<uint16_t> banned = { 2049, 4045, 6000 };
 
