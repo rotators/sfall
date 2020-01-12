@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "..\main.h"
+#include "..\Logging.h"
 #include "..\FalloutEngine\Fallout2.h"
 
 #include "Rotators.h"
@@ -14,6 +15,8 @@
 //
 // Remember to wear protective goggles :)
 //
+
+rfall::Ini rfall::ini;
 
 // Submodules handling
 
@@ -29,23 +32,6 @@ void rfall::SubModuleManager::exitAll() {
 		sfall::dlog_f("Exiting module Rotators->%s...\n", DL_INIT, module->name());
 		module->exit();
 	}
-}
-
-// Any and all configuration should be read from ddraw.rotators.ini; /artifacts/ddraw.rotators.ini should be updated to reflect code, when possible;
-// adds some extra work on PR/merge, but pays off in a long run
-
-const char  rotatorsIni[] = ".\\ddraw.rotators.ini";
-
-std::string rfall::Ini::String(const char* section, const char* setting, const char* defaultValue) {
-	return sfall::GetIniString(section, setting, defaultValue, 512, rotatorsIni);
-}
-
-int rfall::Ini::Int(const char* section, const char* setting, int defaultValue) {
-	return sfall::iniGetInt(section, setting, defaultValue, rotatorsIni);
-}
-
-std::vector<std::string> rfall::Ini::List(const char* section, const char* setting, const char* defaultValue, char delim /* = ',' */) {
-	return sfall::GetIniList(section, setting, defaultValue, 512, delim, rotatorsIni);
 }
 
 // Shortcuts and filling gaps in fo::func::db_*()
@@ -113,20 +99,20 @@ void rfall::misc::FillListVector(FLV type, std::vector<fo::GameObject*>& vec, in
 	// current
 	if (elevation == -1) {
 		if (fo::var::obj_dude == nullptr) {
-			sfall::dlogr( "r::FillListVector() : fo::var::obj_dude == nullptr", DL_MAIN);
+			sfall::dlogr("r::FillListVector() : fo::var::obj_dude == nullptr", DL_MAIN);
 			return;
 		}
 
-		sfall::dlog_f( "r::FillListVector() : fo::var::obj_dude->elevation == %d", DL_MAIN, fo::var::obj_dude->elevation);
+		sfall::dlog_f("r::FillListVector() : fo::var::obj_dude->elevation == %d", DL_MAIN, fo::var::obj_dude->elevation);
 		elevation = static_cast<int8_t>(fo::var::obj_dude->elevation);
 	}
 	// all || specific
-	else if( elevation == -2 || (elevation >= 0 && elevation <= 2)) {
+	else if (elevation == -2 || (elevation >= 0 && elevation <= 2)) {
 		// pass
 	}
 	// out of range
 	else {
-		sfall::dlog_f( "r::FillListVector() : invalid elevation == %d", DL_MAIN, elevation);
+		sfall::dlog_f("r::FillListVector() : invalid elevation == %d", DL_MAIN, elevation);
 		return;
 	}
 
@@ -175,6 +161,9 @@ void rfall::misc::FillListVector(FLV type, std::vector<fo::GameObject*>& vec, in
 //
 
 void sfall::Rotators::init() {
+	if (!rfall::ini.LoadFile("ddraw.rotators.ini"))
+		dlogr("> configuration not found", DL_INIT);
+
 	SafeWrite8(0x410003, 0xF4);
 
 	SubModules.add<HTTPD>(); // dummy on v140_xp

@@ -13,7 +13,7 @@ namespace sfall
 {
 
 void LoadDll::init() {
-	std::vector<std::string> names = Ini::List("Main", "LoadDll", "");
+	std::vector<std::string> names = ini.GetStrVec("Main", "LoadDll", ',');
 
 	for (const auto& name : names) {
 		if (name.empty())

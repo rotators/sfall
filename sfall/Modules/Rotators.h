@@ -7,6 +7,8 @@
 
 #include "Module.h"
 
+#include "..\Rotators.Ini.h"
+
 #define DLL_EXPORT extern "C" __declspec(dllexport)
 
 namespace fo
@@ -44,12 +46,6 @@ public:
 	}
 };
 
-struct Ini {
-	static std::string String(const char* section, const char* setting, const char* defaultValue);
-	static int Int(const char* section, const char* setting, int defaultValue);
-	static std::vector<std::string> List(const char* section, const char* setting, const char* defaultValue, char delim = ',');
-};
-
 struct db {
 	static void* readfile(char* filename, int len);
 	static int filelen(fo::DbFile* file);
@@ -73,6 +69,11 @@ struct misc {
 	static void FillListVector(FLV type, std::vector<fo::GameObject*>& vec, int8_t elevation = -1); // -2=all -1=current 0-2=specific
 };
 
+// Any and all configuration should be read from ddraw.rotators.ini; /artifacts/ddraw.rotators.ini should be updated to reflect code, when possible;
+// adds some extra work on PR/merge, but pays off in a long run
+
+extern Ini ini;
+
 }
 
 namespace sfall
@@ -86,8 +87,6 @@ public:
 	const char* name() { return "Rotators"; }
 	void init();
 	void exit() override;
-
-	static void OnWmRefresh();
 };
 
 }

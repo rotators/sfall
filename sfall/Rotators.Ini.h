@@ -62,11 +62,11 @@ public:
     virtual void Parse(std::basic_istream<char>& is);
     virtual void ParseString(const std::string& str);
 
-    virtual bool         IsSection(const std::string& section);
-    virtual bool         IsSectionKey(const std::string& section, const std::string& key);
-    virtual bool         IsSectionKeyEmpty(const std::string& section, const std::string& key);
-    virtual unsigned int GetSections(std::vector<std::string>& sections);
-    virtual unsigned int GetSectionKeys(const std::string& section, std::vector<std::string>& keys);
+    virtual bool     IsSection(const std::string& section);
+    virtual bool     IsSectionKey(const std::string& section, const std::string& key);
+    virtual bool     IsSectionKeyEmpty(const std::string& section, const std::string& key);
+    virtual uint32_t GetSections(std::vector<std::string>& sections);
+    virtual uint32_t GetSectionKeys(const std::string& section, std::vector<std::string>& keys);
 
     virtual bool MergeSections(const std::string& to, const std::string& from, bool overwrite = false);
     virtual bool RemoveSection(const std::string& section);

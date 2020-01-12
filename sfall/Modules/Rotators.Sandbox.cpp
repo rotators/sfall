@@ -326,9 +326,8 @@ namespace sfall
 	extern void* LoadGameHookFuncAddress;
 	int LoadScreenInit = 0x480AF5;
 	static void MainHook() { }
-	int LoadSlot;
+	int LoadSlot = -1;
 	static __declspec(naked) void LoadScreenInitHook() {
-		LoadSlot = rfall::Ini::Int("Debugging", "AutoLoadSlot", -1);
 		if (LoadSlot != -1) {
 			__asm {
 				jmp LoadScreenInit
@@ -339,7 +338,6 @@ namespace sfall
 	int autoLoadAfter = 0x47CAE5;
 	// Not totally working, need to change "destination screen" somewhere.
 	/*static __declspec(naked) void AutoLoadSave() {
-	LoadSlot = Ini::Int("Debugging", "AutoLoadSlot", -1);
 	if (LoadSlot != -1) {
 		fo::var::slot_cursor = LoadSlot;
 		__asm {
@@ -374,7 +372,7 @@ namespace sfall
 
 	void Sandbox::init()
 	{
-		if (Ini::Int("Debugging", "Sandbox", 0) <= 0)
+		if (!ini.GetBool("Debugging", "Sandbox", false))
 			return;
 
 		dlogr("> remember to wear protective goggles", DL_INIT);
@@ -385,6 +383,7 @@ namespace sfall
 
 		// autoload
 
+		LoadSlot = ini.GetInt("Debugging", "AutoLoadSlot", -1);
 		//sfall::MakeJump(0x480A23, LoadScreenInitHook);
 
 		// display_win draw
