@@ -480,6 +480,9 @@ enum TerrainHoverImage {
 #define WMAP_DEFAULT_SPACE_LEN	(2)
 #define WMAP_DEFAULT_DOT_LEN	(2)
 
+static char** wmTileTerrains = nullptr;
+static int wmWidthInTiles = 7;
+
 static std::array<unsigned char, TerrainHoverImage::size> wmTmpBuffer;
 static bool isHoveringHotspot = false;
 static bool backImageIsCopy = false;
@@ -564,8 +567,38 @@ static void __declspec(naked) DrawingDots() {
 	}
 }
 
+void UpdateTileTerrainMsg(int x, int y, const char * msg)
+{
+	if (!wmTileTerrains)
+	{
+		wmTileTerrains = new char*[fo::var::wmMaxTileNum * 7 * 6];
+		wmWidthInTiles = fo::var::wmNumHorizontalTiles * 7;
+		memset(wmTileTerrains, 0, sizeof(char *) * fo::var::wmMaxTileNum * 7 * 6);
+	}
+	if (wmTileTerrains[x + y * wmWidthInTiles])
+		delete wmTileTerrains[x + y * wmWidthInTiles];
+	wmTileTerrains[x + y * wmWidthInTiles] = new char[strlen(msg)+1];
+	strcpy(wmTileTerrains[x + y * wmWidthInTiles], msg);
+}
+
 static void PrintTerrainType(long x, long y) {
-	char* terrainText = (char*)fo::wmGetCurrentTerrainName();
+	char* terrainText;
+
+	if (wmTileTerrains)
+	{
+		int zoneX = fo::var::world_xpos / 50;
+		int zoneY = fo::var::world_ypos / 50;
+		terrainText = wmTileTerrains[zoneX + zoneY * wmWidthInTiles];
+		if (!terrainText)
+		{
+			terrainText = (char*)fo::wmGetCurrentTerrainName();
+		}
+	}
+	else
+	{
+		terrainText = (char*)fo::wmGetCurrentTerrainName();
+	}
+
 	long txtWidth = fo::GetTextWidthFM(terrainText);
 	if (txtWidth > TerrainHoverImage::width) txtWidth = TerrainHoverImage::width;
 

@@ -9,6 +9,8 @@
 #include "Scripting/OpcodeContext.h"
 #include "Scripting/ScriptValue.h"
 
+#include "Interface.h"
+
 #include "Rotators.h"
 #include "Rotators.Script.h"
 
@@ -47,6 +49,14 @@ void op_toupper(sfall::script::OpcodeContext& ctx) {
 	ctx.setReturn(cstrdup(str.c_str()));
 }
 
+void op_set_hotspot_title(sfall::script::OpcodeContext& ctx) {
+	int x = ctx.arg(0).asInt();
+	int y = ctx.arg(1).asInt();
+	const char * msg = ctx.arg(2).asString();
+
+	sfall::UpdateTileTerrainMsg(x, y, msg);
+}
+
 void op_rotators(sfall::script::OpcodeContext& ctx) {
 	ctx.setReturn("Rotators, rotate!");
 }
@@ -56,6 +66,7 @@ void op_rotators(sfall::script::OpcodeContext& ctx) {
 static const sfall::script::SfallMetarule metarules[] = {
 	{ "r_tolower", op_tolower, 1, 1, -1, {sfall::script::ARG_STRING} },
 	{ "r_toupper", op_toupper, 1, 1, -1, {sfall::script::ARG_STRING} },
+	{ "r_set_hotspot_title",  op_set_hotspot_title,  3, 3, -1, {sfall::script::ARG_INT, sfall::script::ARG_INT, sfall::script::ARG_STRING} },
 
 	{ "rotators",  op_rotators, 0, 0 }
 };
