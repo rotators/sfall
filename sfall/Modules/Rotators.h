@@ -53,7 +53,7 @@ struct Ini {
 struct db {
 	static void* readfile(char* filename, int len);
 	static int filelen(fo::DbFile* file);
-	static void* fastread(char* filename);
+	static void* fastread(const char* filename);
 };
 
 struct misc {

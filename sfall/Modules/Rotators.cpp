@@ -71,8 +71,11 @@ int rfall::db::filelen(fo::DbFile* dbFile) {
 	return len;
 }
 
-void* rfall::db::fastread(char* filename)
+void* rfall::db::fastread(const char* filename)
 {
+	if (!strlen(filename))
+		return nullptr;
+
 	if (fo::func::db_access(filename)) {
 		fo::DbFile* file = fo::func::db_fopen(filename, "r");
 		int len = 0;
