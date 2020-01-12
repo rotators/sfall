@@ -510,23 +510,26 @@ static void AddNewDot() {
 	dot_xpos = fo::var::world_xpos;
 	dot_ypos = fo::var::world_ypos;
 
-	long* terrainId = *(long**)FO_VAR_world_subtile;
+	long terrainId = WMAP_TERRAIN_DESERT;
+	if (*(long**)FO_VAR_world_subtile)
+		terrainId = **(long**)FO_VAR_world_subtile;
+
 	// Reinitialize if current terrain has smaller values than previous
-	if (dotLen > optionTerrainDotLen[*terrainId])
-		dotLen = optionTerrainDotLen[*terrainId];
-	if(spaceLen > optionTerrainSpaceLen[*terrainId])
-		spaceLen = optionTerrainSpaceLen[*terrainId];
+	if (dotLen > optionTerrainDotLen[terrainId])
+		dotLen = optionTerrainDotLen[terrainId];
+	if(spaceLen > optionTerrainSpaceLen[terrainId])
+		spaceLen = optionTerrainSpaceLen[terrainId];
 
 	if (dotLen <= 0 && spaceLen) {
 		spaceLen--;
 		if (!spaceLen) {
-			dotLen = optionTerrainDotLen[*terrainId];
+			dotLen = optionTerrainDotLen[terrainId];
 		};
 		return;
 	}
 	dotLen--;
 
-	spaceLen = optionTerrainSpaceLen[*terrainId];
+	spaceLen = optionTerrainSpaceLen[terrainId];
 
 	dots.emplace_back(dot_xpos, dot_ypos);
 }
