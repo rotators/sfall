@@ -617,8 +617,9 @@ static void __declspec(naked) wmInterfaceRefresh_hook() {
 		} else if (!fo::var::target_xpos && !fo::var::target_ypos) {
 			// player stops moving
 			dots.clear();
-			dotLen = optionTerrainDotLen[**(long**)FO_VAR_world_subtile];
-			spaceLen = optionTerrainSpaceLen[**(long**)FO_VAR_world_subtile];
+			// Reinitialize on next AddNewDot
+			dotLen = 9999;
+			spaceLen = 9999;
 		}
 	}
 	if (isHoveringHotspot && !fo::var::In_WorldMap) {
