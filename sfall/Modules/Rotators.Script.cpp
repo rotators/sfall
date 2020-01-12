@@ -35,6 +35,35 @@ static char* cstrdup(const char* str) {
 
 // Pseudopcodes
 
+// All .ini files read by scripts are cached and read from memory; visibly speeds up extracting data from large files, like WORLDMAP.TXT
+static std::unordered_map<std::string, rfall::Ini> IniCache;
+
+static rfall::Ini& GetCachedIni(const char* name) {
+	auto it = IniCache.find(name);
+	if (it != IniCache.end())
+		return it->second;
+
+	sfall::dlog_f( "Adding INI to cache: %s\n", DL_MAIN, name);
+
+	Ini iniFile;
+	iniFile.LoadFile(name);
+	IniCache.insert(std::make_pair(name, iniFile));
+
+	return IniCache[name];
+}
+
+void op_get_ini_string(sfall::script::OpcodeContext& ctx) {
+	ctx.setReturn(cstrdup(GetCachedIni(ctx.arg(0).asString()).GetStr(ctx.arg(1).asString(), ctx.arg(2).asString(), ctx.arg(3).asString()).c_str()));
+}
+
+void op_set_hotspot_title(sfall::script::OpcodeContext& ctx) {
+	int x = ctx.arg(0).asInt();
+	int y = ctx.arg(1).asInt();
+	const char* msg = ctx.arg(2).asString();
+
+	sfall::UpdateTileTerrainMsg(x, y, msg);
+}
+
 void op_tolower(sfall::script::OpcodeContext& ctx) {
 	auto str = std::string(ctx.arg(0).asString()); // sue me.
 	std::transform(str.begin(), str.end(), str.begin(), ::tolower);
@@ -49,14 +78,7 @@ void op_toupper(sfall::script::OpcodeContext& ctx) {
 	ctx.setReturn(cstrdup(str.c_str()));
 }
 
-void op_set_hotspot_title(sfall::script::OpcodeContext& ctx) {
-	int x = ctx.arg(0).asInt();
-	int y = ctx.arg(1).asInt();
-	const char * msg = ctx.arg(2).asString();
-
-	sfall::UpdateTileTerrainMsg(x, y, msg);
-}
-
+// Used by scripts to detect if game is using customized ddraw.dll
 void op_rotators(sfall::script::OpcodeContext& ctx) {
 	ctx.setReturn("Rotators, rotate!");
 }
@@ -64,11 +86,12 @@ void op_rotators(sfall::script::OpcodeContext& ctx) {
 // Module
 
 static const sfall::script::SfallMetarule metarules[] = {
-	{ "r_tolower", op_tolower, 1, 1, -1, {sfall::script::ARG_STRING} },
-	{ "r_toupper", op_toupper, 1, 1, -1, {sfall::script::ARG_STRING} },
+	{ "r_get_ini_string",     op_get_ini_string,     4, 4, -1, {sfall::script::ARG_STRING, sfall::script::ARG_STRING, sfall::script::ARG_STRING, sfall::script::ARG_STRING} },
 	{ "r_set_hotspot_title",  op_set_hotspot_title,  3, 3, -1, {sfall::script::ARG_INT, sfall::script::ARG_INT, sfall::script::ARG_STRING} },
+	{ "r_tolower",            op_tolower,            1, 1, -1, {sfall::script::ARG_STRING} },
+	{ "r_toupper",            op_toupper,            1, 1, -1, {sfall::script::ARG_STRING} },
 
-	{ "rotators",  op_rotators, 0, 0 }
+	{ "rotators",             op_rotators,           0, 0 }
 };
 
 void sfall::Script::init() {
