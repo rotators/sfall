@@ -21,9 +21,9 @@
 #include "..\main.h"
 #include "..\FalloutEngine\Fallout2.h"
 #include "..\FalloutEngine\EngineUtils.h"
+#include "..\Utils.h"
 #include "Graphics.h"
 #include "LoadGameHook.h"
-#include "..\Utils.h"
 
 #include "Interface.h"
 
@@ -463,7 +463,7 @@ static void WorldmapViewportPatch() {
 	dlogr(" Done", DL_INIT);
 }
 
-///////////////////////// FALLOUT 1 WORLDMAP FEATURES //////////////////////////
+///////////////////////// FALLOUT 1 WORLD MAP FEATURES /////////////////////////
 
 enum TerrainHoverImage {
 	width = 100,
@@ -471,14 +471,8 @@ enum TerrainHoverImage {
 	size = width * height
 };
 
-#define WMAP_TERRAIN_DESERT		(0)
-#define WMAP_TERRAIN_MOUNTAIN	(1)
-#define WMAP_TERRAIN_CITY		(2)
-#define WMAP_TERRAIN_OCEAN		(3)
-#define WMAP_TERRAIN_TYPE_CNT	(4)
-
-#define WMAP_DEFAULT_SPACE_LEN	(2)
-#define WMAP_DEFAULT_DOT_LEN	(2)
+#define WMAP_DEFAULT_SPACE_LEN  (2)
+#define WMAP_DEFAULT_DOT_LEN    (2)
 
 static char** wmTileTerrains = nullptr;
 static int wmWidthInTiles = 7;
@@ -500,36 +494,43 @@ static long spaceLen = WMAP_DEFAULT_SPACE_LEN;
 static long dotLen = WMAP_DEFAULT_DOT_LEN;
 static long dot_xpos = 0;
 static long dot_ypos = 0;
+static long terrCount = 0;
 
 static int* optionTerrainDotLen = nullptr;
 static int* optionTerrainSpaceLen = nullptr;
-
-static bool Fo1Behavior = false;
 
 static void AddNewDot() {
 	dot_xpos = fo::var::world_xpos;
 	dot_ypos = fo::var::world_ypos;
 
-	long terrainId = WMAP_TERRAIN_DESERT;
+	long terrainId = 0;
 	if (*(long**)FO_VAR_world_subtile)
 		terrainId = **(long**)FO_VAR_world_subtile;
 
 	// Reinitialize if current terrain has smaller values than previous
-	if (dotLen > optionTerrainDotLen[terrainId])
-		dotLen = optionTerrainDotLen[terrainId];
-	if(spaceLen > optionTerrainSpaceLen[terrainId])
-		spaceLen = optionTerrainSpaceLen[terrainId];
+	if (terrainId < terrCount) {
+		if (dotLen > optionTerrainDotLen[terrainId])
+			dotLen = optionTerrainDotLen[terrainId];
+		if(spaceLen > optionTerrainSpaceLen[terrainId])
+			spaceLen = optionTerrainSpaceLen[terrainId];
+	}
 
 	if (dotLen <= 0 && spaceLen) {
 		spaceLen--;
-		if (!spaceLen) {
-			dotLen = optionTerrainDotLen[terrainId];
+		if (!spaceLen) { // set dot length
+			if (terrainId < terrCount)
+				dotLen = optionTerrainDotLen[terrainId];
+			else
+				dotLen = WMAP_DEFAULT_DOT_LEN;
 		};
 		return;
 	}
 	dotLen--;
 
-	spaceLen = optionTerrainSpaceLen[terrainId];
+	if (terrainId < terrCount)
+		spaceLen = optionTerrainSpaceLen[terrainId];
+	else
+		spaceLen = WMAP_DEFAULT_SPACE_LEN;
 
 	dots.emplace_back(dot_xpos, dot_ypos);
 }
@@ -751,29 +752,22 @@ static void WorldMapInterfacePatch() {
 	bool showTravelMarkers, showTerrainType;
 	if (showTravelMarkers = GetConfigInt("Interface", "WorldMapTravelMarkers", 0) != 0) {
 		dlog("Applying world map travel markers patch.", DL_INIT);
-		int color = GetConfigInt("Interface", "TravelMarkerColor", 133); // color index in palette: R = 252, G = 0, B = 0
+		int color = GetConfigInt("Interface", "TravelMarkerColor", 134); // color index in palette: R = 224, G = 0, B = 0
 
 		if (color > 255) color = 255; else if (color < 1) color = 1;
 		colorDot = color;
 
-		optionTerrainSpaceLen = new int[WMAP_TERRAIN_TYPE_CNT];
-		optionTerrainDotLen = new int[WMAP_TERRAIN_TYPE_CNT];
-		for (size_t i = 0; i < WMAP_TERRAIN_TYPE_CNT; i++) {
-			optionTerrainDotLen[i] = WMAP_DEFAULT_DOT_LEN;
-			optionTerrainSpaceLen[i] = WMAP_DEFAULT_SPACE_LEN;
-		}
-
 		auto dotList = GetConfigList("Interface", "TravelMarkerDots", "", 512);
 		size_t count = dotList.size();
 		if (count) {
-			if (count > WMAP_TERRAIN_TYPE_CNT)
-				count = WMAP_TERRAIN_TYPE_CNT;
+			optionTerrainSpaceLen = new int[count];
+			optionTerrainDotLen = new int[count];
+			terrCount = count;
 			std::vector<std::string> pair;
 			pair.reserve(2);
 			for (size_t i = 0; i < count; i++) {
 				split(dotList[i], ':', std::back_inserter(pair), 2);
-				if (pair.size() >= 2)
-				{
+				if (pair.size() >= 2) {
 					optionTerrainDotLen[i] = atoi(pair[0].c_str());
 					optionTerrainSpaceLen[i] = atoi(pair[1].c_str());
 					if (optionTerrainDotLen[i] < 1)
@@ -784,9 +778,7 @@ static void WorldMapInterfacePatch() {
 						optionTerrainSpaceLen[i] = 1;
 					else if (optionTerrainSpaceLen[i] > 10)
 						optionTerrainSpaceLen[i] = 10;
-				}
-				else
-				{
+				} else {
 					optionTerrainDotLen[i] = WMAP_DEFAULT_DOT_LEN;
 					optionTerrainSpaceLen[i] = WMAP_DEFAULT_SPACE_LEN;
 				}
@@ -806,10 +798,6 @@ static void WorldMapInterfacePatch() {
 		dlogr(" Done", DL_INIT);
 	}
 	if (showTravelMarkers || showTerrainType) HookCall(0x4C3C7E, wmInterfaceRefresh_hook); // when calling wmDrawCursorStopped_
-
-	if (GetConfigInt("Misc", "Fallout1Behavior", 0)) {
-		Fo1Behavior = true;
-	}
 
 	// Car fuel gauge graphics patch
 	MakeCall(0x4C528A, wmInterfaceRefreshCarFuel_hack_empty);
@@ -906,8 +894,8 @@ void Interface::init() {
 
 void Interface::exit() {
 	if (ifaceFrm) delete ifaceFrm;
-	if (optionTerrainDotLen) delete optionTerrainDotLen;
-	if (optionTerrainSpaceLen) delete optionTerrainSpaceLen;
+	if (optionTerrainDotLen) delete[] optionTerrainDotLen;
+	if (optionTerrainSpaceLen) delete[] optionTerrainSpaceLen;
 }
 
 }

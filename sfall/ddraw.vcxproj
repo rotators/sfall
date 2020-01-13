@@ -291,8 +291,6 @@
     <ClInclude Include="FalloutEngine\Functions.h" />
     <ClInclude Include="FalloutEngine\Functions_def.h" />
     <ClInclude Include="Modules\CritterStats.h" />
-    <ClInclude Include="Modules\HTTP\HTML.h" />
-    <ClInclude Include="Modules\HTTP\Routing.h" />
     <ClInclude Include="Modules\Interface.h" />
     <ClInclude Include="Modules\Drugs.h" />
     <ClInclude Include="Modules\HookScripts\CombatHs.h" />
@@ -315,6 +313,7 @@
     <ClInclude Include="Modules\Objects.h" />
     <ClInclude Include="Modules\PlayerModel.h" />
     <ClInclude Include="Modules\SpeedPatch.h" />
+    <ClInclude Include="Modules\SubModules\CombatBlock.h" />
     <ClInclude Include="Modules\Worldmap.h" />
     <ClInclude Include="Modules\ScriptExtender.h" />
     <ClInclude Include="Modules\BarBoxes.h" />
@@ -384,6 +383,8 @@
     <ClInclude Include="Modules\Rotators.LoadDll.h" />
     <ClInclude Include="Modules\Rotators.Sandbox.h" />
     <ClInclude Include="Modules\Rotators.Script.h" />
+    <ClInclude Include="Modules\HTTP\HTML.h" />
+    <ClInclude Include="Modules\HTTP\Routing.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CheckAddress.cpp" />
@@ -392,8 +393,6 @@
     <ClCompile Include="FalloutEngine\Variables.cpp" />
     <ClCompile Include="FalloutEngine\Functions.cpp" />
     <ClCompile Include="Modules\CritterStats.cpp" />
-    <ClCompile Include="Modules\HTTP\HTML.cpp" />
-    <ClCompile Include="Modules\HTTP\Routing.cpp" />
     <ClCompile Include="Modules\Interface.cpp" />
     <ClCompile Include="Modules\Drugs.cpp" />
     <ClCompile Include="Modules\HookScripts\CombatHs.cpp" />
@@ -415,6 +414,7 @@
     <ClCompile Include="Modules\Objects.cpp" />
     <ClCompile Include="Modules\PlayerModel.cpp" />
     <ClCompile Include="Modules\SpeedPatch.cpp" />
+    <ClCompile Include="Modules\SubModules\CombatBlock.cpp" />
     <ClCompile Include="Modules\Worldmap.cpp" />
     <ClCompile Include="Modules\ScriptExtender.cpp" />
     <ClCompile Include="Modules\BarBoxes.cpp" />
@@ -474,12 +474,6 @@
     <ClCompile Include="Logging.cpp" />
     <ClCompile Include="Modules\ExtraSaveSlots.cpp" />
     <ClCompile Include="Modules\ScriptShaders.cpp" />
-    <ClCompile Include="Rotators.Ini.cpp" />
-    <ClCompile Include="Modules\Rotators.cpp" />
-    <ClCompile Include="Modules\Rotators.HTTPD.cpp" />
-    <ClCompile Include="Modules\Rotators.LoadDll.cpp" />
-    <ClCompile Include="Modules\Rotators.Sandbox.cpp" />
-    <ClCompile Include="Modules\Rotators.Script.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
@@ -487,6 +481,14 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='DevXP|Win32'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Utils.cpp" />
+    <ClCompile Include="Rotators.Ini.cpp" />
+    <ClCompile Include="Modules\Rotators.cpp" />
+    <ClCompile Include="Modules\Rotators.HTTPD.cpp" />
+    <ClCompile Include="Modules\Rotators.LoadDll.cpp" />
+    <ClCompile Include="Modules\Rotators.Sandbox.cpp" />
+    <ClCompile Include="Modules\Rotators.Script.cpp" />
+    <ClCompile Include="Modules\HTTP\HTML.cpp" />
+    <ClCompile Include="Modules\HTTP\Routing.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="exports.def" />
