@@ -73,7 +73,8 @@ enum DialogOutFlags : uint8_t {
 	DIALOGOUT_CLEAN       = 0x20  // no buttons
 };
 
-static constexpr uint8_t DialogOutColor = 145; // text color used by most dialogs, except character creation screen
+// default color index for text used by most dialogs; character creation screen uses green in few cases
+static constexpr uint8_t DialogOutColor = 145;
 
 // NOTE: none of strings[N].c_str() pointers can be invalidated before they reach engine
 static int32_t __stdcall DialogOut(const std::vector<std::string> strings, int32_t flags = DIALOGOUT_NORMAL, int32_t color1 = DialogOutColor, int32_t color23 = DialogOutColor) {
@@ -102,10 +103,10 @@ static int32_t __stdcall DialogOut(const std::vector<std::string> strings, int32
 	int32_t result = -1;
 	__asm {
 		nop;
-		push flags;        // render flags, 0 for defaults
-		push color23;      // color of second/third line
+		push flags;        // render flags, see DialogOutFlags; if 0, engine sets DIALOGOUT_NORMAL or DIALOGOUT_SMALL (depends on text width)
+		push color23;      // color index for second/third line
 		push 0;            // "DisplayMsg" what's that for?
-		push color1;       // color of first line
+		push color1;       // color index for first line
 		push 116;          // not sure is it really y
 		mov  ecx, 192;     // not sure is it really x
 		mov  ebx, size23;  // size of extra lines array, 0-2
