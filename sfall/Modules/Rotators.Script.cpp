@@ -5,6 +5,7 @@
 #include <unordered_map>
 
 #include "../Logging.h"
+#include "../Utils.h"
 #include "../FalloutEngine/Fallout2.h"
 
 #include "Scripting/Arrays.h"
@@ -68,56 +69,54 @@ enum DialogOutFlags : uint8_t {
 	DIALOGOUT_SMALL       = 0x02, // uses smaller graphic
 	DIALOGOUT_ALIGN_LEFT  = 0x04, // text moved to left
 	DIALOGOUT_ALIGN_TOP   = 0x08, // text moved to top
-	DIALOGOUT_YESNO       = 0x10, // DONE button replaced with YES/NO; clicking YES returns 1, clicking NO returns 0
+	DIALOGOUT_YESNO       = 0x10, // DONE button replaced with YES/NO -- WIP, useless in scripts in current state
 	DIALOGOUT_CLEAN       = 0x20  // no buttons
 };
 
-static constexpr uint8_t DialogOutColor = 145;
+static constexpr uint8_t DialogOutColor = 145; // text color used by most dialogs, except character creation screen
 
-static int32_t __stdcall DialogOut(std::vector<std::string> strings, int32_t flags = DIALOGOUT_NORMAL, int32_t color1 = DialogOutColor, int32_t color23 = DialogOutColor) {
+// NOTE: none of strings[N].c_str() pointers can be invalidated before they reach engine
+static int32_t __stdcall DialogOut(const std::vector<std::string> strings, int32_t flags = DIALOGOUT_NORMAL, int32_t color1 = DialogOutColor, int32_t color23 = DialogOutColor) {
 	if (strings.empty())
 		return -1;
+
+	// most likely should be `min(strings.size(), 3) - 1` for public use
+	// not applying limit here in case someone wants to experiment with it
+	const uint32_t size23 = strings.size() - 1;
 
 	// convert first line to char*
 	// no length validation here; empty string is allowed, as it doesn't seem to break anything
 	// when/if drawing directly on screen will be possible some day, it might be useful for displaying small images instead of text only
-	char*    text1  = cstrdup(strings.front().c_str());
-	char**   text23 = nullptr;
-	uint32_t extra  = 0;
+	const char* text1 = strings.front().c_str();
 
 	// convert second/third line to char**
-	strings.erase(strings.begin());
-	if (!strings.empty()) {
-		text23 = new char*[strings.size()];
+	char** text23 = nullptr;
+	if (size23) {
+		text23 = new char*[size23];
 
-		for (extra = 0; extra < strings.size(); extra++) {
-			text23[extra] = new char[strings[extra].size() + 1];
-			strcpy(text23[extra], strings[extra].c_str());
+		for (uint32_t idx = 0; idx < size23; idx++) {
+			text23[idx] = (char*)strings[idx+1].c_str();
 		}
 	}
 
 	int32_t result = -1;
 	__asm {
 		nop;
-		xor  eax, eax;     // (mov eax,0)
 		push flags;        // render flags, 0 for defaults
 		push color23;      // color of second/third line
 		push 0;            // "DisplayMsg" what's that for?
 		push color1;       // color of first line
 		push 116;          // not sure is it really y
 		mov  ecx, 192;     // not sure is it really x
-		mov  ebx, extra;   // length of extra lines array, 0-2
+		mov  ebx, size23;  // size of extra lines array, 0-2
 		mov  edx, text23;  // second/third line
 		mov  eax, text1;   // first line
-		call fo::funcoffs::dialog_out_;//(text1, text23, extra, x | y, color1, ?=0, color23, flags);
+		call fo::funcoffs::dialog_out_;//(text1, text23, size23, x | y, color1, ?=0, color23, flags);
 		mov  result, eax;  // always (?) returns 1 on success, unless YESNO flag is set; error values are unknown
 	}
 
-	delete text1;
-	for (uint32_t idx = 0; idx < extra; idx++) {
-		delete[] text23[idx];
-	}
-	delete[] text23;
+	if (size23)
+		delete[] text23;
 
 	return result;
 }
@@ -129,23 +128,10 @@ void r_message_box(sfall::script::OpcodeContext& ctx) {
 
 	// Converting char* to std::string just to convert them back to char* again is ... questionable design ... i agree
 	// However, it allows scripts and dll use exactly same function, so i'll stick to that instead of code duplication, unless someone write better solution
-	std::vector<std::string> strings;
+	std::vector<std::string> strings = sfall::split(ctx.arg(0).asString(), '|');
 
-	if (ctx.arg(0).isString())
-		strings.push_back(ctx.arg(0).strValue());
-	else {
-		auto id = ctx.arg(0).rawValue();
-
-		if (sfall::script::arrays.find(id) == sfall::script::arrays.end()) { // make sure it IS array
-			DialogOut({"ERROR", "array deleted"}, DIALOGOUT_SMALL | DIALOGOUT_CLEAN, 134);
-			ctx.setReturn(-1, sfall::script::DataType::INT);
-			return;
-		}
-
-		for (int32_t idx = 0, size = min(sfall::script::LenArray(id), 3); idx < size; idx++) { // ignore everything after 3rd element
-			strings.push_back(sfall::script::GetArrayKey(id, idx).asString());
-		}
-	}
+	if (strings.size() > 3)
+		strings.resize(3);
 
 	// must match defaults used by DialogOut()
 	int32_t flags  = ctx.numArgs() >= 2 ? ctx.arg(1).asInt() : DIALOGOUT_NORMAL;
@@ -189,8 +175,8 @@ void r_otators(sfall::script::OpcodeContext& ctx) {
 // Module
 
 static const sfall::script::SfallMetarule metarules[] = {
-	{ "r_message_box",        r_message_box,           1, 4, -1, {sfall::script::ARG_INTSTR, sfall::script::ARG_INT, sfall::script::ARG_INT, sfall::script::ARG_INT} },
 	{ "r_get_ini_string",     r_get_ini_string,        4, 4, -1, {sfall::script::ARG_STRING, sfall::script::ARG_STRING, sfall::script::ARG_STRING, sfall::script::ARG_STRING} },
+	{ "r_message_box",        r_message_box,           1, 4, -1, {sfall::script::ARG_STRING, sfall::script::ARG_INT, sfall::script::ARG_INT, sfall::script::ARG_INT} },
 	{ "r_set_hotspot_title",  r_set_hotspot_title,     3, 3, -1, {sfall::script::ARG_INT, sfall::script::ARG_INT, sfall::script::ARG_STRING} },
 	{ "r_tolower",            r_tolower,               1, 1, -1, {sfall::script::ARG_STRING} },
 	{ "r_toupper",            r_toupper,               1, 1, -1, {sfall::script::ARG_STRING} },
