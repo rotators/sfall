@@ -466,5 +466,14 @@ void sf_get_text_width(OpcodeContext& ctx) {
 	ctx.setReturn(fo::GetTextWidth(ctx.arg(0).strValue()));
 }
 
+static std::string strToCase;
+
+void sf_string_to_case(OpcodeContext& ctx) {
+	strToCase = ctx.arg(0).strValue();
+	std::transform(strToCase.begin(), strToCase.end(), strToCase.begin(), ctx.arg(1).rawValue() ? ::toupper : ::tolower);
+
+	ctx.setReturn(strToCase.c_str());
+}
+
 }
 }

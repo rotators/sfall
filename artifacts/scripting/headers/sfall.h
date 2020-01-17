@@ -247,7 +247,7 @@
 // fake perks/traits add mode flags
 #define ADD_PERK_MODE_TRAIT     (1)  // add to the player's traits
 #define ADD_PERK_MODE_PERK      (2)  // add to the player's perks
-#define ADD_PERK_MODE_REMOVE    (4)  // remove from the list of selectable perks
+#define ADD_PERK_MODE_REMOVE    (4)  // remove from the list of selectable perks (after added to the player)
 
 // sfall_funcX macros
 #define add_extra_msg_file(name)                        sfall_func1("add_extra_msg_file", name)
@@ -323,6 +323,8 @@
 #define string_compare(str1, str2)                      sfall_func2("string_compare", str1, str2)
 #define string_compare_locale(str1, str2, codePage)     sfall_func3("string_compare", str1, str2, codePage)
 #define string_format(format, a1, a2)                   sfall_func3("string_format", format, a1, a2)
+#define string_tolower(text)                            sfall_func2("string_to_case", text, 0)
+#define string_toupper(text)                            sfall_func2("string_to_case", text, 1)
 #define tile_by_position(x, y)                          sfall_func2("tile_by_position", x, y)
 #define tile_refresh_display                            sfall_func0("tile_refresh_display")
 #define unjam_lock(obj)                                 sfall_func1("unjam_lock", obj)
