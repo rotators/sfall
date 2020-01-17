@@ -146,12 +146,43 @@ void r_message_box(sfall::script::OpcodeContext& ctx) {
 	ctx.setReturn(result, sfall::script::DataType::INT);
 }
 
+// r_set_hotspot_title
+
+static char** wmTileTerrains = nullptr;
+static int wmWidthInTiles = 7;
+
+char* rfall::wmGetCurrentTerrainName()
+{
+	char* terrainText;
+
+	if (wmTileTerrains) {
+		int zoneX = fo::var::world_xpos / 50;
+		int zoneY = fo::var::world_ypos / 50;
+		terrainText = wmTileTerrains[zoneX + zoneY * wmWidthInTiles];
+		if (!terrainText)
+			terrainText = (char*)fo::wmGetCurrentTerrainName();
+	}
+	else
+		terrainText = (char*)fo::wmGetCurrentTerrainName();
+
+	return terrainText;
+}
+
 void r_set_hotspot_title(sfall::script::OpcodeContext& ctx) {
 	int x = ctx.arg(0).asInt();
 	int y = ctx.arg(1).asInt();
 	const char* msg = ctx.arg(2).asString();
 
-	sfall::UpdateTileTerrainMsg(x, y, msg);
+	if (!wmTileTerrains) {
+		wmTileTerrains = new char*[fo::var::wmMaxTileNum * 7 * 6];
+		wmWidthInTiles = fo::var::wmNumHorizontalTiles * 7;
+		memset(wmTileTerrains, 0, sizeof(char *) * fo::var::wmMaxTileNum * 7 * 6);
+	}
+
+	if (wmTileTerrains[x + y * wmWidthInTiles])
+		delete wmTileTerrains[x + y * wmWidthInTiles];
+	wmTileTerrains[x + y * wmWidthInTiles] = new char[strlen(msg)+1];
+	strcpy(wmTileTerrains[x + y * wmWidthInTiles], msg);
 }
 
 void r_tolower(sfall::script::OpcodeContext& ctx) {
@@ -232,4 +263,8 @@ void sfall::Script::init() {
 		sfall::dlog_f("> sfall_func%s(\"%s\"%s)\n", DL_INIT, name.c_str(), metarule->name, args.c_str());
 		sfall::script::metaruleTable[metarule->name] = metarule;
 	}
+}
+
+void sfall::Script::exit() {
+	// TODO delete wmTileTerrains
 }

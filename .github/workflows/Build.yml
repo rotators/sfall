@@ -100,7 +100,7 @@ jobs:
            ldd  $ddraw.dll
 
            mkdir -p ddraw
-           mv $ddraw.dll ddraw/ddraw.rotators.dll
+           mv $ddraw.dll ddraw/ddraw.dll
            mv artifacts/ddraw.ini ddraw
            mv artifacts/ddraw.rotators.ini ddraw
            mv sfall/UI ddraw
