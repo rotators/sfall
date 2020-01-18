@@ -5,6 +5,7 @@
 #include <unordered_map>
 
 #include "../Logging.h"
+#include "../SafeWrite.h"
 #include "../Utils.h"
 #include "../FalloutEngine/Fallout2.h"
 
@@ -13,6 +14,7 @@
 #include "Scripting/ScriptValue.h"
 
 #include "Interface.h"
+#include "ScriptExtender.h"
 
 #include "Rotators.h"
 #include "Rotators.Script.h"
@@ -122,9 +124,46 @@ static int32_t __stdcall DialogOut(const std::vector<std::string> strings, int32
 	return result;
 }
 
-static bool dialogOut = false;
+static sfall::ScriptProgram* dialogOutScriptProgram = nullptr;
+static std::string           dialogOutProc = "";
+static uint32_t              dialogOutInput = 0;
+
+static void __declspec(naked) DialogOut_get_input_hook() { // cache get_input_ return value until engine decides what to do next
+	__asm {
+		nop;
+		call fo::funcoffs::get_input_; // restore
+		mov dialogOutInput, eax;
+		ret;
+	}
+}
+
+static void __declspec(naked) DialogOut_message_exit_hook() {
+	__asm {
+		nop;
+		call fo::funcoffs::message_exit_; // restore
+		pushad;
+	}
+
+	if (dialogOutScriptProgram) {
+		// TODO how to pass dialogOutInput?
+		if (!dialogOutProc.empty())
+			sfall::RunScriptProc(dialogOutScriptProgram, dialogOutProc.c_str());
+
+		dialogOutScriptProgram = nullptr;
+		dialogOutProc.clear();
+	}
+
+	dialogOutInput = 0;
+
+	__asm {
+		nop;
+		popad;
+		ret;
+	}
+}
+
 void r_message_box(sfall::script::OpcodeContext& ctx) {
-	if (dialogOut)
+	if (dialogOutScriptProgram)
 		return;
 
 	// Converting char* to std::string just to convert them back to char* again is ... questionable design ... i agree
@@ -139,9 +178,11 @@ void r_message_box(sfall::script::OpcodeContext& ctx) {
 	int32_t color1 = ctx.numArgs() >= 3 ? ctx.arg(2).asInt() : DialogOutColor;
 	int32_t color2 = ctx.numArgs() >= 4 ? ctx.arg(3).asInt() : DialogOutColor;
 
-	dialogOut = true;
+	// ugh
+	dialogOutScriptProgram = sfall::ScriptExtender::GetGlobalScriptProgram(ctx.program());
+	dialogOutProc =  ctx.numArgs() >= 5 ? ctx.arg(4).asString() : "";
+
 	int32_t result = DialogOut(strings, flags, color1, color2);
-	dialogOut = false;
 
 	ctx.setReturn(result, sfall::script::DataType::INT);
 }
@@ -208,7 +249,7 @@ void r_otators(sfall::script::OpcodeContext& ctx) {
 
 static const sfall::script::SfallMetarule metarules[] = {
 	{ "r_get_ini_string",     r_get_ini_string,        4, 4, -1, {sfall::script::ARG_STRING, sfall::script::ARG_STRING, sfall::script::ARG_STRING, sfall::script::ARG_STRING} },
-	{ "r_message_box",        r_message_box,           1, 4, -1, {sfall::script::ARG_STRING, sfall::script::ARG_INT, sfall::script::ARG_INT, sfall::script::ARG_INT} },
+	{ "r_message_box",        r_message_box,           1, 5, -1, {sfall::script::ARG_STRING, sfall::script::ARG_INT, sfall::script::ARG_INT, sfall::script::ARG_INT, sfall::script::ARG_STRING} },
 	{ "r_set_hotspot_title",  r_set_hotspot_title,     3, 3, -1, {sfall::script::ARG_INT, sfall::script::ARG_INT, sfall::script::ARG_STRING} },
 	{ "r_tolower",            r_tolower,               1, 1, -1, {sfall::script::ARG_STRING} },
 	{ "r_toupper",            r_toupper,               1, 1, -1, {sfall::script::ARG_STRING} },
@@ -263,6 +304,9 @@ void sfall::Script::init() {
 		sfall::dlog_f("> sfall_func%s(\"%s\"%s)\n", DL_INIT, name.c_str(), metarule->name, args.c_str());
 		sfall::script::metaruleTable[metarule->name] = metarule;
 	}
+
+	HookCall(0x41dd84, DialogOut_get_input_hook);    // dialog_out_
+	HookCall(0x41de78, DialogOut_message_exit_hook); // dialog_out_
 }
 
 void sfall::Script::exit() {
