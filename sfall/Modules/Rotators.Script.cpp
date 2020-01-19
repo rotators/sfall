@@ -24,6 +24,9 @@ using namespace rfall;
 // Declared in Scripting/Handlers/Metarule.cpp
 namespace sfall { namespace script { extern std::unordered_map<std::string, const sfall::script::SfallMetarule*> metaruleTable; }}
 
+// Declared in ScriptExtender.cpp
+namespace sfall { extern long overrideScriptStructFixedParam; }
+
 // Helpers
 
 static char* cstrdup(const char* str) {
@@ -38,6 +41,15 @@ static char* cstrdup(const char* str) {
 	return dup;
 }
 
+static void RunProgramWithFixedParam(fo::Program* program, std::string procName, long fixedParam) {
+	const char* proc = procName.c_str();
+	int procNum = fo::func::interpretFindProcedure(program, proc);
+	if (procNum != -1) {
+		sfall::overrideScriptStructFixedParam = fixedParam;
+		fo::func::executeProcedure(program, procNum);
+		sfall::overrideScriptStructFixedParam = 0;
+	}
+}
 
 // r_get_ini_*() //
 // All .ini files read by scripts are cached and read from memory; speeds up extracting data from large files (like WORLDMAP.TXT) on some hardware
@@ -78,10 +90,39 @@ enum DialogOutFlags : uint8_t {
 // default color index for text used by most dialogs; character creation screen uses green in few cases
 static constexpr uint8_t DialogOutColor = 145;
 
+struct DialogOutData
+{
+	// General data
+	uint8_t Type; // dialog_out_ caller type; 0=engine, 1=dll, 2=ssl
+
+	// DLL data
+	// TODO
+
+	// SSL data
+	fo::Program* Program;
+	std::string  ProcName;
+
+	// Result
+	uint32_t Input;
+
+	DialogOutData() {
+		Clear();
+	}
+
+	void Clear()
+	{
+		Type = Input = 0;
+		Program = nullptr;
+		ProcName.clear();
+		Input = 0;
+	};
+};
+static struct DialogOutData dialogOut;
+
 // NOTE: none of strings[N].c_str() pointers can be invalidated before they reach engine
-static int32_t __stdcall DialogOut(const std::vector<std::string> strings, int32_t flags = DIALOGOUT_NORMAL, int32_t color1 = DialogOutColor, int32_t color23 = DialogOutColor) {
+static bool __stdcall DialogOut(const std::vector<std::string> strings, int32_t flags = DIALOGOUT_NORMAL, int32_t color1 = DialogOutColor, int32_t color23 = DialogOutColor) {
 	if (strings.empty())
-		return -1;
+		return false;
 
 	// most likely should be `min(strings.size(), 3) - 1` for public use
 	// not applying limit here in case someone wants to experiment with it
@@ -102,7 +143,9 @@ static int32_t __stdcall DialogOut(const std::vector<std::string> strings, int32
 		}
 	}
 
-	int32_t result = -1;
+	if (!dialogOut.Type)
+		dialogOut.Type = 1;
+
 	__asm {
 		nop;
 		push flags;        // render flags, see DialogOutFlags; if 0, engine sets DIALOGOUT_NORMAL or DIALOGOUT_SMALL (depends on text width)
@@ -115,26 +158,65 @@ static int32_t __stdcall DialogOut(const std::vector<std::string> strings, int32
 		mov  edx, text23;  // second/third line
 		mov  eax, text1;   // first line
 		call fo::funcoffs::dialog_out_;//(text1, text23, size23, x | y, color1, ?=0, color23, flags);
-		mov  result, eax;  // always (?) returns 1 on success, unless YESNO flag is set; error values are unknown
 	}
 
 	if (size23)
 		delete[] text23;
 
-	return result;
+	return true;
 }
 
-static sfall::ScriptProgram* dialogOutScriptProgram = nullptr;
-static std::string           dialogOutProc = "";
-static uint32_t              dialogOutInput = 0;
-
 static void __declspec(naked) DialogOut_get_input_hook() { // cache get_input_ return value until engine decides what to do next
+	static int input;
+
 	__asm {
 		nop;
 		call fo::funcoffs::get_input_; // restore
-		mov dialogOutInput, eax;
+		mov input, eax;
+	}
+
+	dialogOut.Input = input;
+
+	__asm {
+		nop;
 		ret;
 	}
+}
+
+static void __stdcall DialogOut_message_exit_cpp() {
+	if (dialogOut.Type == 0) {
+		/* pass without changes */
+	}
+	else {
+		bool result = false;
+
+		switch (dialogOut.Input) {
+			case 'Y':
+			case 'y':
+			case '\r':  // enter
+			case 0x1f4: // button
+				result = true;
+				break;
+			case 'N':
+			case 'n':
+			case 27:    // esc
+			case 0x1f5: // button
+				result = false;
+				break;
+			default:
+				sfall::dlog_f( "DialogOut : unknown input<%d>\n", DL_MAIN, dialogOut.Input );
+				break;
+		}
+
+		if (dialogOut.Type == 1) {
+			// TODO
+		}
+		else if (dialogOut.Type == 2 && dialogOut.Program && !dialogOut.ProcName.empty()) {
+			RunProgramWithFixedParam(dialogOut.Program, dialogOut.ProcName, result ? 1 : 0);
+		}
+	}
+
+	dialogOut.Clear();
 }
 
 static void __declspec(naked) DialogOut_message_exit_hook() {
@@ -144,16 +226,7 @@ static void __declspec(naked) DialogOut_message_exit_hook() {
 		pushad;
 	}
 
-	if (dialogOutScriptProgram) {
-		// TODO how to pass dialogOutInput?
-		if (!dialogOutProc.empty())
-			sfall::RunScriptProc(dialogOutScriptProgram, dialogOutProc.c_str());
-
-		dialogOutScriptProgram = nullptr;
-		dialogOutProc.clear();
-	}
-
-	dialogOutInput = 0;
+	DialogOut_message_exit_cpp();
 
 	__asm {
 		nop;
@@ -163,8 +236,10 @@ static void __declspec(naked) DialogOut_message_exit_hook() {
 }
 
 void r_message_box(sfall::script::OpcodeContext& ctx) {
-	if (dialogOutScriptProgram)
+	if (dialogOut.Program) {
+		ctx.setReturn(-1, sfall::script::DataType::INT);
 		return;
+	}
 
 	// Converting char* to std::string just to convert them back to char* again is ... questionable design ... i agree
 	// However, it allows scripts and dll use exactly same function, so i'll stick to that instead of code duplication, unless someone write better solution
@@ -173,18 +248,21 @@ void r_message_box(sfall::script::OpcodeContext& ctx) {
 	if (strings.size() > 3)
 		strings.resize(3);
 
-	// must match defaults used by DialogOut()
+	// Must match defaults used by DialogOut()
 	int32_t flags  = ctx.numArgs() >= 2 ? ctx.arg(1).asInt() : DIALOGOUT_NORMAL;
 	int32_t color1 = ctx.numArgs() >= 3 ? ctx.arg(2).asInt() : DialogOutColor;
 	int32_t color2 = ctx.numArgs() >= 4 ? ctx.arg(3).asInt() : DialogOutColor;
 
-	// ugh
-	dialogOutScriptProgram = sfall::ScriptExtender::GetGlobalScriptProgram(ctx.program());
-	dialogOutProc =  ctx.numArgs() >= 5 ? ctx.arg(4).asString() : "";
+	if (ctx.numArgs() >= 5) {
+		dialogOut.Type = 2;
+		dialogOut.Program = ctx.program();
+		dialogOut.ProcName =  ctx.arg(4).asString();
+	}
 
-	int32_t result = DialogOut(strings, flags, color1, color2);
-
-	ctx.setReturn(result, sfall::script::DataType::INT);
+	if( DialogOut(strings,flags, color1, color2))
+		ctx.setReturn(0, sfall::script::DataType::INT);
+	else
+		ctx.setReturn(-1, sfall::script::DataType::INT);
 }
 
 /* r_set_hotspot_title

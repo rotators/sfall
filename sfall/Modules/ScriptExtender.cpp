@@ -123,6 +123,7 @@ bool isGameLoading;
 bool alwaysFindScripts;
 
 fo::ScriptInstance overrideScriptStruct = {0};
+long overrideScriptStructFixedParam = 0;
 
 long ScriptExtender::GetScriptReturnValue() {
 	return overrideScriptStruct.returnValue;
@@ -153,7 +154,7 @@ static DWORD __stdcall FindSid(fo::Program* script) {
 		if (timedEvent && timedEvent->script->ptr == script) {
 			overrideScriptStruct.fixedParam = timedEvent->fixed_param;
 		} else {
-			overrideScriptStruct.fixedParam = 0;
+			overrideScriptStruct.fixedParam = overrideScriptStructFixedParam;
 		}
 		overrideScriptStruct.targetObject = 0;
 		overrideScriptStruct.selfObject = 0;
