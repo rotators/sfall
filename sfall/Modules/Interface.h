@@ -12,5 +12,4 @@ public:
 	void exit() override;
 };
 
-void UpdateTileTerrainMsg(int x, int y, const char * msg);
 }
