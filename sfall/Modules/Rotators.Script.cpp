@@ -187,7 +187,7 @@ void r_message_box(sfall::script::OpcodeContext& ctx) {
 	ctx.setReturn(result, sfall::script::DataType::INT);
 }
 
-// r_set_hotspot_title
+/* r_set_hotspot_title
 
 static char** wmTileTerrains = nullptr;
 static int wmWidthInTiles = 7;
@@ -225,6 +225,7 @@ void r_set_hotspot_title(sfall::script::OpcodeContext& ctx) {
 	wmTileTerrains[x + y * wmWidthInTiles] = new char[strlen(msg)+1];
 	strcpy(wmTileTerrains[x + y * wmWidthInTiles], msg);
 }
+*/
 
 void r_tolower(sfall::script::OpcodeContext& ctx) {
 	auto str = std::string(ctx.arg(0).asString()); // sue me.
@@ -250,7 +251,7 @@ void r_otators(sfall::script::OpcodeContext& ctx) {
 static const sfall::script::SfallMetarule metarules[] = {
 	{ "r_get_ini_string",     r_get_ini_string,        4, 4, -1, {sfall::script::ARG_STRING, sfall::script::ARG_STRING, sfall::script::ARG_STRING, sfall::script::ARG_STRING} },
 	{ "r_message_box",        r_message_box,           1, 5, -1, {sfall::script::ARG_STRING, sfall::script::ARG_INT, sfall::script::ARG_INT, sfall::script::ARG_INT, sfall::script::ARG_STRING} },
-	{ "r_set_hotspot_title",  r_set_hotspot_title,     3, 3, -1, {sfall::script::ARG_INT, sfall::script::ARG_INT, sfall::script::ARG_STRING} },
+//	{ "r_set_hotspot_title",  r_set_hotspot_title,     3, 3, -1, {sfall::script::ARG_INT, sfall::script::ARG_INT, sfall::script::ARG_STRING} },
 	{ "r_tolower",            r_tolower,               1, 1, -1, {sfall::script::ARG_STRING} },
 	{ "r_toupper",            r_toupper,               1, 1, -1, {sfall::script::ARG_STRING} },
 
