@@ -14,22 +14,29 @@ jobs:
    fail-fast: false
    matrix:
     cfg:
-    - { toolset: v140_xp, configuration: ReleaseXP, allow-fail: true }
-    - { toolset: v142,    configuration: ReleaseXP, allow-fail: nope }
-    - { toolset: v142,    configuration: Debug,     allow-fail: true }
+    - { toolset: v140_xp, configuration: ReleaseXP, allow-priv: nope, allow-fail: nope }
+    - { toolset: v140_xp, configuration: Debug,     allow-priv: nope, allow-fail: true }
+    - { toolset: v142,    configuration: ReleaseXP, allow-priv: true, allow-fail: nope }
+    - { toolset: v142,    configuration: Debug,     allow-priv: nope, allow-fail: true }
   steps:
 
   - name:  Config
     run:   |
            :
            echo ::set-env name=DXSDK_DIR::$HOME/cache/
+           if   [ "${{ github.event.repository.private }}" != "true" ]; then
+                echo ::set-env name=GHA_RUN::true
+           elif [ "${{ github.event.repository.private }}" == 'true' ] && [ "${{ matrix.cfg.allow-priv }}" == "true" ]; then
+                echo ::set-env name=GHA_RUN::true
+           fi
     shell: bash
 
   - name: Clone
+    if:   env.GHA_RUN == 'true'
     uses: actions/checkout@v2
 
   - name: Cache
-    if:   github.event_name == 'push'
+    if:   env.GHA_RUN == 'true' && github.event_name == 'push'
     id:   cache
     uses: actions/cache@v1
     with:
@@ -37,7 +44,7 @@ jobs:
      key:  cache
 
   - name:  Cache create
-    if:    steps.cache.outputs.cache-hit != 'true'
+    if:    env.GHA_RUN == 'true' && steps.cache.outputs.cache-hit != 'true'
     run:   |
            :
            echo ::group::DX2010
@@ -66,7 +73,16 @@ jobs:
            du -hd0 $HOME/cache
     shell: bash
 
+  # "Temporary" workaround until https://github.com/actions/virtual-environments/pull/289 is merged
+  # Takes awful amount of time :(
+  - name:  Install Microsoft.VisualStudio.Component.WinXP
+    if:    env.GHA_RUN == 'true' && matrix.cfg.toolset == 'v140_xp'
+    run:   |
+           "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" modify --channelId VisualStudio.16.Release --productId Microsoft.VisualStudio.Product.Enterprise -q --add Microsoft.VisualStudio.Component.WinXP
+    shell: cmd
+
   - name:  Build
+    if:    env.GHA_RUN == 'true'
     run:   |
            :
            echo "@echo off" > sfall/PostBuild.cmd
@@ -92,7 +108,7 @@ jobs:
     shell: bash
 
   - name:  Build check
-    if:    env.GHA_BUILD == 'OK'
+    if:    env.GHA_RUN == 'true' && env.GHA_BUILD == 'OK'
     run:   |
            :
            ddraw="sfall/${{ matrix.cfg.configuration }}/ddraw"
@@ -102,13 +118,59 @@ jobs:
            mkdir -p ddraw
            cp $ddraw.dll ddraw/ddraw.dll
            mv $ddraw.dll ddraw/ddraw.rotators.dll
-           mv artifacts/ddraw.ini ddraw
-           mv artifacts/ddraw.rotators.ini ddraw
-           mv sfall/UI ddraw
     shell: bash
 
   - uses: actions/upload-artifact@v1
-    if:   env.GHA_BUILD == 'OK'
+    if:   env.GHA_RUN == 'true' && env.GHA_BUILD == 'OK'
     with:
      name: ddraw-${{ matrix.cfg.toolset }}-${{ matrix.cfg.configuration }}
+     path: ddraw
+
+ Repack:
+  needs:   Build
+  runs-on: ubuntu-latest
+  steps:
+
+  - name: Clone
+    uses: actions/checkout@v2
+
+  - name: /
+    run:  |
+          :
+          mkdir -p ddraw
+          mv artifacts/ddraw.ini ddraw
+          mv artifacts/ddraw.rotators.ini ddraw
+          mv sfall/UI ddraw
+
+  - name:  v140_xp/ReleaseXP/
+    uses:  actions/download-artifact@v1
+    with:
+     name: ddraw-v140_xp-ReleaseXP
+     path: ddraw/v140_xp/ReleaseXP
+    continue-on-error: true
+
+  - name:  v140_xp/Debug/
+    uses:  actions/download-artifact@v1
+    with:
+     name: ddraw-v140_xp-Debug
+     path: ddraw/v140_xp/Debug
+    continue-on-error: true
+
+  - name:  v142/ReleaseXP/
+    uses:  actions/download-artifact@v1
+    with:
+     name: ddraw-v142-ReleaseXP
+     path: ddraw/v142/ReleaseXP
+    continue-on-error: true
+
+  - name:  v142/Debug/
+    uses:  actions/download-artifact@v1
+    with:
+     name: ddraw-v142-Debug
+     path: ddraw/v142/Debug
+    continue-on-error: true
+
+  - uses: actions/upload-artifact@v1
+    with:
+     name: ddraw
      path: ddraw
