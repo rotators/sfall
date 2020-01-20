@@ -7,7 +7,7 @@
 // Used by other submodules to check if HTTPD is currently enabled, so it must be declared for v140_xp build
 uint16_t sfall::HTTPD::Port = 0;
 
-#if _MSC_VER >= 1920
+//#if _MSC_VER >= 1920
 
 #include <string>
 #include <thread>
@@ -410,4 +410,4 @@ void sfall::HTTPD::exit() {
 	}
 }
 
-#endif // _MSC_VER >= 1920 //
+//#endif // _MSC_VER >= 1920 //
