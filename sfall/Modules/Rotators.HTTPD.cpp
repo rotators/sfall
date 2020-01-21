@@ -68,7 +68,13 @@ void hasKey(char* key)
 static __declspec(naked) void xfopen_hook() {
 	__asm {
 		pushad
+		mov esi, xfopenLoadFile
 		mov xfopenLoadFile, edi
+		cmp ecx, 0
+		jne open // ptr is valid
+		mov xfopenLoadFile, esi
+		jmp end
+	open:
 		mov eax, dword ptr ss : [ecx]
 		mov xfopenLoadedFrom, eax
 
@@ -84,6 +90,7 @@ static __declspec(naked) void xfopen_hook() {
 		xfopened[xf1] = xf2;
 	}
 	__asm {
+	end:
 		popad
 		jmp _rewind
 	}
