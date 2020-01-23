@@ -212,7 +212,11 @@ static void __stdcall DialogOut_message_exit_cpp() {
 			// TODO
 		}
 		else if (dialogOut.Type == 2 && dialogOut.Program && !dialogOut.ProcName.empty()) {
-			RunProgramWithFixedParam(dialogOut.Program, dialogOut.ProcName, result ? 1 : 0);
+			fo::Program* program = dialogOut.Program;
+			std::string procName = dialogOut.ProcName;
+			dialogOut.Clear();
+
+			RunProgramWithFixedParam(program, procName, result ? 1 : 0);
 		}
 	}
 
@@ -236,11 +240,6 @@ static void __declspec(naked) DialogOut_message_exit_hook() {
 }
 
 void r_message_box(sfall::script::OpcodeContext& ctx) {
-	if (dialogOut.Program) {
-		ctx.setReturn(-1, sfall::script::DataType::INT);
-		return;
-	}
-
 	// Converting char* to std::string just to convert them back to char* again is ... questionable design ... i agree
 	// However, it allows scripts and dll use exactly same function, so i'll stick to that instead of code duplication, unless someone write better solution
 	std::vector<std::string> strings = sfall::split(ctx.arg(0).asString(), '|');
@@ -254,6 +253,12 @@ void r_message_box(sfall::script::OpcodeContext& ctx) {
 	int32_t color2 = ctx.numArgs() >= 4 ? ctx.arg(3).asInt() : DialogOutColor;
 
 	if (ctx.numArgs() >= 5) {
+		// callback is stored as global variable - only one can be active at a time
+		if (dialogOut.Program) {
+			ctx.setReturn(-1, sfall::script::DataType::INT);
+			return;
+		}
+
 		dialogOut.Type = 2;
 		dialogOut.Program = ctx.program();
 		dialogOut.ProcName =  ctx.arg(4).asString();
