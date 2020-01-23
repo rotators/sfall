@@ -522,11 +522,12 @@ void DisableHorriganPatch() {
 }
 
 void DisplaySecondWeaponRangePatch() {
-	if (GetConfigInt("Misc", "DisplaySecondWeaponRange", 1)) { // TODO: remove option?
+	// Display the range of the second attack mode in the inventory when you switch weapon modes in active item slots
+	//if (GetConfigInt("Misc", "DisplaySecondWeaponRange", 1)) {
 		dlog("Applying display second weapon range patch.", DL_INIT);
 		HookCall(0x472201, display_stats_hook);
 		dlogr(" Done", DL_INIT);
-	}
+	//}
 }
 
 void KeepWeaponSelectModePatch() {
@@ -590,7 +591,7 @@ void F1EngineBehaviorPatch() {
 		dlog("Applying Fallout 1 engine behavior patch.", DL_INIT);
 		BlockCall(0x4A4343); // disable playing the final movie/credits after the endgame slideshow
 		SafeWrite8(0x477C71, 0xEB); // disable halving the weight for power armor items
-		HookCall(0x43F872, endgame_movie_hook); // play Movie11 or Movie12 depending on the player's gender before the credits
+		HookCall(0x43F872, endgame_movie_hook); // play movie 10 or 11 based on the player's gender before the credits
 		dlogr(" Done", DL_INIT);
 	}
 }

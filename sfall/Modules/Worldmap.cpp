@@ -212,25 +212,6 @@ static void __declspec(naked) ViewportHook() {
 	}
 }
 
-static void __declspec(naked) wmTownMapFunc_hack() {
-	__asm {
-		cmp  dword ptr [edi][eax * 4 + 0], 0;  // Visited
-		je   end;
-		cmp  dword ptr [edi][eax * 4 + 4], -1; // Xpos
-		je   end;
-		cmp  dword ptr [edi][eax * 4 + 8], -1; // Ypos
-		je   end;
-		// engine code
-		mov  edx, [edi][eax * 4 + 0xC];
-		mov  [esi], edx
-		retn;
-end:
-		add  esp, 4; // destroy the return address
-		mov  eax, 0x4C4976;
-		jmp  eax;
-	}
-}
-
 static DWORD _stdcall PathfinderCalc(DWORD perkLevel, DWORD ticks) {
 	double multi = mapMultiMod * scriptMapMulti;
 
@@ -315,6 +296,28 @@ end:
 	}
 }
 
+static void __declspec(naked) wmRndEncounterOccurred_hook() {
+	__asm {
+		push eax;
+		mov  edx, 1;
+		mov  dword ptr ds:[FO_VAR_wmRndCursorFid], 0;
+		mov  ds:[FO_VAR_wmEncounterIconShow], edx;
+		mov  ecx, 7;
+jLoop:
+		mov  eax, edx;
+		sub  eax, ds:[FO_VAR_wmRndCursorFid];
+		mov  ds:[FO_VAR_wmRndCursorFid], eax;
+		call fo::funcoffs::wmInterfaceRefresh_;
+		mov  eax, 200;
+		call fo::funcoffs::block_for_tocks_;
+		dec  ecx;
+		jnz  jLoop;
+		mov  ds:[FO_VAR_wmEncounterIconShow], ecx;
+		pop  eax; // map id
+		jmp  fo::funcoffs::map_load_idx_;
+	}
+}
+
 static void RestRestore() {
 	if (!restMode) return;
 	restMode = false;
@@ -372,14 +375,6 @@ void TimeLimitPatch() {
 			SafeWrite8(0x4A34EC, limit);
 			SafeWrite8(0x4A3544, limit);
 		}
-		dlogr(" Done", DL_INIT);
-	}
-}
-
-void TownMapsHotkeyFix() {
-	if (GetConfigInt("Misc", "TownMapHotkeysFix", 1)) {
-		dlog("Applying town map hotkeys patch.", DL_INIT);
-		MakeCall(0x4C495A, wmTownMapFunc_hack, 1);
 		dlogr(" Done", DL_INIT);
 	}
 }
@@ -638,10 +633,12 @@ void Worldmap::init() {
 	PathfinderFixInit();
 	StartingStatePatches();
 	TimeLimitPatch();
-	TownMapsHotkeyFix();
 	WorldLimitsPatches();
 	WorldmapFpsPatch();
 	PipBoyAutomapsPatch();
+
+	// Add a flashing icon to the Horrigan encounter
+	HookCall(0x4C071C, wmRndEncounterOccurred_hook);
 
 	LoadGameHook::OnGameReset() += []() {
 		SetCarInterfaceArt(433); // set index
