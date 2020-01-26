@@ -15,9 +15,9 @@ jobs:
    matrix:
     cfg:
     - { toolset: v140_xp, configuration: ReleaseXP, allow-priv: nope, allow-fail: nope }
-    - { toolset: v140_xp, configuration: Debug,     allow-priv: nope, allow-fail: true }
+    - { toolset: v140_xp, configuration: DevXP,     allow-priv: nope, allow-fail: true }
     - { toolset: v142,    configuration: ReleaseXP, allow-priv: true, allow-fail: nope }
-    - { toolset: v142,    configuration: Debug,     allow-priv: nope, allow-fail: true }
+    - { toolset: v142,    configuration: DevXP,     allow-priv: nope, allow-fail: true }
   steps:
 
   - name:  Config
@@ -149,11 +149,11 @@ jobs:
      path: ddraw/v140_xp/ReleaseXP
     continue-on-error: true
 
-  - name:  v140_xp/Debug/
+  - name:  v140_xp/DevXP/
     uses:  actions/download-artifact@v1
     with:
-     name: ddraw-v140_xp-Debug
-     path: ddraw/v140_xp/Debug
+     name: ddraw-v140_xp-DevXP
+     path: ddraw/v140_xp/DevXP
     continue-on-error: true
 
   - name:  v142/ReleaseXP/
@@ -163,11 +163,11 @@ jobs:
      path: ddraw/v142/ReleaseXP
     continue-on-error: true
 
-  - name:  v142/Debug/
+  - name:  v142/DevXP/
     uses:  actions/download-artifact@v1
     with:
-     name: ddraw-v142-Debug
-     path: ddraw/v142/Debug
+     name: ddraw-v142-DevXP
+     path: ddraw/v142/DevXP
     continue-on-error: true
 
   - uses: actions/upload-artifact@v1
