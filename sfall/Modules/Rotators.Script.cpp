@@ -90,39 +90,13 @@ enum DialogOutFlags : uint8_t {
 // default color index for text used by most dialogs; character creation screen uses green in few cases
 static constexpr uint8_t DialogOutColor = 145;
 
-struct DialogOutData
-{
-	// General data
-	uint8_t Type; // dialog_out_ caller type; 0=engine, 1=dll, 2=ssl
-
-	// DLL data
-	// TODO
-
-	// SSL data
-	fo::Program* Program;
-	std::string  ProcName;
-
-	// Result
-	uint32_t Input;
-
-	DialogOutData() {
-		Clear();
-	}
-
-	void Clear()
-	{
-		Type = Input = 0;
-		Program = nullptr;
-		ProcName.clear();
-		Input = 0;
-	};
-};
-static struct DialogOutData dialogOut;
-
 // NOTE: none of strings[N].c_str() pointers can be invalidated before they reach engine
-static bool __stdcall DialogOut(const std::vector<std::string> strings, int32_t flags = DIALOGOUT_NORMAL, int32_t color1 = DialogOutColor, int32_t color23 = DialogOutColor) {
+static bool DialogOut(const std::vector<std::string> strings, int32_t flags = DIALOGOUT_NORMAL, int32_t color1 = DialogOutColor, int32_t color23 = DialogOutColor) {
 	if (strings.empty())
 		return false;
+
+	// always freeze scripts engine, even if function has been called by dll
+	*(DWORD*)FO_VAR_script_engine_running = 0;
 
 	// most likely should be `min(strings.size(), 3) - 1` for public use
 	// not applying limit here in case someone wants to experiment with it
@@ -143,12 +117,10 @@ static bool __stdcall DialogOut(const std::vector<std::string> strings, int32_t 
 		}
 	}
 
-	if (!dialogOut.Type)
-		dialogOut.Type = 1;
-
+	int32_t result = 0;
 	__asm {
 		nop;
-		push flags;        // render flags, see DialogOutFlags; if 0, engine sets DIALOGOUT_NORMAL or DIALOGOUT_SMALL (depends on text width)
+		push flags;        // render flags, see DialogOutFlags; if 0, engine sets DIALOGOUT_NORMAL or DIALOGOUT_SMALL (depends on text size)
 		push color23;      // color index for second/third line
 		push 0;            // "DisplayMsg" what's that for?
 		push color1;       // color index for first line
@@ -158,90 +130,21 @@ static bool __stdcall DialogOut(const std::vector<std::string> strings, int32_t 
 		mov  edx, text23;  // second/third line
 		mov  eax, text1;   // first line
 		call fo::funcoffs::dialog_out_;//(text1, text23, size23, x | y, color1, ?=0, color23, flags);
+		mov result, eax;   // returns 0 or 1 if DIALOGOUT_YESNO is set, 1 otherwise
 	}
 
 	if (size23)
 		delete[] text23;
 
-	return true;
-}
+	*(DWORD*)FO_VAR_script_engine_running = 1;
 
-static void __declspec(naked) DialogOut_get_input_hook() { // cache get_input_ return value until engine decides what to do next
-	static int input;
-
-	__asm {
-		nop;
-		call fo::funcoffs::get_input_; // restore
-		mov input, eax;
-	}
-
-	dialogOut.Input = input;
-
-	__asm {
-		nop;
-		ret;
-	}
-}
-
-static void __stdcall DialogOut_message_exit_cpp() {
-	if (dialogOut.Type == 0) {
-		/* pass without changes */
-	}
-	else {
-		bool result = false;
-
-		switch (dialogOut.Input) {
-			case 'Y':
-			case 'y':
-			case '\r':  // enter
-			case 0x1f4: // button
-				result = true;
-				break;
-			case 'N':
-			case 'n':
-			case 27:    // esc
-			case 0x1f5: // button
-				result = false;
-				break;
-			default:
-				sfall::dlog_f( "DialogOut : unknown input<%d>\n", DL_MAIN, dialogOut.Input );
-				break;
-		}
-
-		if (dialogOut.Type == 1) {
-			// TODO
-		}
-		else if (dialogOut.Type == 2 && dialogOut.Program && !dialogOut.ProcName.empty()) {
-			fo::Program* program = dialogOut.Program;
-			std::string procName = dialogOut.ProcName;
-			dialogOut.Clear();
-
-			RunProgramWithFixedParam(program, procName, result ? 1 : 0);
-		}
-	}
-
-	dialogOut.Clear();
-}
-
-static void __declspec(naked) DialogOut_message_exit_hook() {
-	__asm {
-		nop;
-		call fo::funcoffs::message_exit_; // restore
-		pushad;
-	}
-
-	DialogOut_message_exit_cpp();
-
-	__asm {
-		nop;
-		popad;
-		ret;
-	}
+	return result ? true : false;
 }
 
 void r_message_box(sfall::script::OpcodeContext& ctx) {
 	// Converting char* to std::string just to convert them back to char* again is ... questionable design ... i agree
 	// However, it allows scripts and dll use exactly same function, so i'll stick to that instead of code duplication, unless someone write better solution
+	// Changing DialogOut() to accept char*, char** is not one of them
 	std::vector<std::string> strings = sfall::split(ctx.arg(0).asString(), '|');
 
 	if (strings.size() > 3)
@@ -252,22 +155,8 @@ void r_message_box(sfall::script::OpcodeContext& ctx) {
 	int32_t color1 = ctx.numArgs() >= 3 ? ctx.arg(2).asInt() : DialogOutColor;
 	int32_t color2 = ctx.numArgs() >= 4 ? ctx.arg(3).asInt() : DialogOutColor;
 
-	if (ctx.numArgs() >= 5) {
-		// callback is stored as global variable - only one can be active at a time
-		if (dialogOut.Program) {
-			ctx.setReturn(-1, sfall::script::DataType::INT);
-			return;
-		}
-
-		dialogOut.Type = 2;
-		dialogOut.Program = ctx.program();
-		dialogOut.ProcName =  ctx.arg(4).asString();
-	}
-
-	if( DialogOut(strings,flags, color1, color2))
-		ctx.setReturn(0, sfall::script::DataType::INT);
-	else
-		ctx.setReturn(-1, sfall::script::DataType::INT);
+	bool result = DialogOut(strings, flags, color1, color2);
+	ctx.setReturn( result ? 1 : 0, sfall::script::DataType::INT);
 }
 
 // Used by scripts to detect if game is using customized ddraw.dll
@@ -279,7 +168,7 @@ void r_otators(sfall::script::OpcodeContext& ctx) {
 
 static const sfall::script::SfallMetarule metarules[] = {
 	{ "r_get_ini_string",     r_get_ini_string,        4, 4, -1, {sfall::script::ARG_STRING, sfall::script::ARG_STRING, sfall::script::ARG_STRING, sfall::script::ARG_STRING} },
-	{ "r_message_box",        r_message_box,           1, 5, -1, {sfall::script::ARG_STRING, sfall::script::ARG_INT, sfall::script::ARG_INT, sfall::script::ARG_INT, sfall::script::ARG_STRING} },
+	{ "r_message_box",        r_message_box,           1, 4, -1, {sfall::script::ARG_STRING, sfall::script::ARG_INT, sfall::script::ARG_INT, sfall::script::ARG_INT} },
 
 	{ "rotators",             r_otators,               0, 0 }
 };
@@ -331,9 +220,6 @@ void sfall::Script::init() {
 		sfall::dlog_f("> sfall_func%s(\"%s\"%s)\n", DL_INIT, name.c_str(), metarule->name, args.c_str());
 		sfall::script::metaruleTable[metarule->name] = metarule;
 	}
-
-	HookCall(0x41dd84, DialogOut_get_input_hook);    // dialog_out_
-	HookCall(0x41de78, DialogOut_message_exit_hook); // dialog_out_
 }
 
 void sfall::Script::exit() {
