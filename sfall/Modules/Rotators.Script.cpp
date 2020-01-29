@@ -219,10 +219,9 @@ void sfall::Script::init() {
 
 		sfall::dlog_f("> sfall_func%s(\"%s\"%s)\n", DL_INIT, name.c_str(), metarule->name, args.c_str());
 		sfall::script::metaruleTable[metarule->name] = metarule;
-
-		// Needed for various voodoo magic
-		SafeWrite32(0x410004, (DWORD)&VirtualProtect);
 	}
+	// Needed for various voodoo magic
+	SafeWrite32(0x410004, (DWORD)&VirtualProtect);
 }
 
 void sfall::Script::exit() {
