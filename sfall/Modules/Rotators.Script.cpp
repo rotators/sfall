@@ -164,11 +164,62 @@ void r_otators(sfall::script::OpcodeContext& ctx) {
 	ctx.setReturn("Rotators, rotate!");
 }
 
+// Voodoo
+
+/*
+#define r_write_byte(addr,val)    sfall_func("r_write", 0, addr, val)
+#define r_write_short(addr,val)   sfall_func("r_write", 1, addr, val)
+#define r_write_int(addr,val)     sfall_func("r_write", 2, addr, val)
+#define r_write_string(addr,val)  sfall_func("r_write", 3, addr, val)
+*/
+
+void r_write(sfall::script::OpcodeContext& ctx) {
+	int32_t type = ctx.arg(0).asInt();
+	int32_t addr = ctx.arg(1).asInt();
+
+	// type 0-2 must be int
+	if((type >= 0 && type <= 2) && !ctx.arg(2).isInt()) {
+		// TODO log error
+
+		ctx.setReturn(-1, sfall::script::DataType::INT);
+		return;
+	}
+	// type 3 must be string
+	else if(type == 3 && !ctx.arg(2).isString()) {
+		// TODO log error
+
+		ctx.setReturn(-1, sfall::script::DataType::INT);
+		return;
+	}
+
+	switch(type) {
+		case 0: // r_write_byte
+			sfall::SafeWrite8(addr, static_cast<BYTE>(ctx.arg(2).asInt()));
+			break;
+		case 1: // r_write_short
+			sfall::SafeWrite16(addr, static_cast<WORD>(ctx.arg(2).asInt()));
+			break;
+		case 2: // r_write_int
+			sfall::SafeWrite32(addr, static_cast<DWORD>(ctx.arg(2).asInt()));
+			break;
+		case 3: // r_write_string
+			sfall::SafeWriteStr(addr, ctx.arg(2).strValue());
+			break;
+		default:
+			ctx.setReturn(-1, sfall::script::DataType::INT);
+			return;
+	}
+
+	ctx.setReturn(0, sfall::script::DataType::INT);
+}
+
 // Module
 
 static const sfall::script::SfallMetarule metarules[] = {
 	{ "r_get_ini_string",     r_get_ini_string,        4, 4, -1, {sfall::script::ARG_STRING, sfall::script::ARG_STRING, sfall::script::ARG_STRING, sfall::script::ARG_STRING} },
 	{ "r_message_box",        r_message_box,           1, 4, -1, {sfall::script::ARG_STRING, sfall::script::ARG_INT, sfall::script::ARG_INT, sfall::script::ARG_INT} },
+
+	{ "r_write",              r_write,                 3, 3, -1, {sfall::script::ARG_INT, sfall::script::ARG_INT, sfall::script::ARG_INTSTR} },
 
 	{ "rotators",             r_otators,               0, 0 }
 };
