@@ -167,11 +167,86 @@ void r_otators(sfall::script::OpcodeContext& ctx) {
 // Voodoo
 
 /*
+#define r_call_offset_push(val)   sfall_func("r_call_offset_push", val)
+#define r_call_offset(addr)       sfall_func("r_call_offset", addr)
 #define r_write_byte(addr,val)    sfall_func("r_write", 0, addr, val)
 #define r_write_short(addr,val)   sfall_func("r_write", 1, addr, val)
 #define r_write_int(addr,val)     sfall_func("r_write", 2, addr, val)
 #define r_write_string(addr,val)  sfall_func("r_write", 3, addr, val)
 */
+
+static int32_t call_offset_buff[16];
+static int32_t call_offset_args;
+
+void r_call_offset_push(sfall::script::OpcodeContext& ctx) {
+	int32_t value = ctx.arg(0).asInt();
+
+	if(call_offset_args >= sizeof(call_offset_buff) / sizeof(int32_t)) {
+		ctx.printOpcodeError("maximum %d arguments allowed", sizeof(call_offset_buff) / sizeof(int32_t));
+
+		ctx.setReturn(-1, sfall::script::DataType::INT);
+		return;
+	}
+
+	call_offset_buff[call_offset_args++] = value;
+}
+
+void r_call_offset(sfall::script::OpcodeContext& ctx) { // watcom
+	static int addr, arg, result;
+
+	addr = ctx.arg(0).asInt();
+	arg = 0;
+
+	// LTR -> RTL
+	if(call_offset_args > 5)
+		std::reverse(std::begin(call_offset_buff) + 4, std::begin(call_offset_buff) + call_offset_args);
+
+	__asm {
+		nop;
+		push esi;
+		jmp _check;
+	_loop:
+		mov esi, arg;
+	//_eax:
+		cmp arg, 0;
+		jne _edx;
+		mov eax, call_offset_buff[esi*4];
+		jmp _inc;
+	_edx:
+		cmp arg, 1;
+		jne _ebx;
+		mov edx, call_offset_buff[esi*4];
+		jmp _inc;
+	_ebx:
+		cmp arg, 2;
+		jne _ecx;
+		mov ebx, call_offset_buff[esi*4];
+		jmp _inc;
+	_ecx:
+		cmp arg, 3;
+		jne _push;
+		mov ecx, call_offset_buff[esi*4];
+		jmp _inc;
+	_push:
+		push call_offset_buff[esi*4];
+	_inc:
+		inc arg;
+	_check:
+		mov esi, call_offset_args;
+		cmp arg, esi;
+		je _call;
+		jmp _loop;
+	_call:
+		call addr;
+		mov result, eax;
+		pop esi;
+	}
+
+	std::memset(call_offset_buff, 0, sizeof(call_offset_buff));
+	call_offset_args = 0;
+
+	ctx.setReturn(result, sfall::script::DataType::INT);
+}
 
 void r_write(sfall::script::OpcodeContext& ctx) {
 	int32_t type = ctx.arg(0).asInt();
@@ -179,14 +254,14 @@ void r_write(sfall::script::OpcodeContext& ctx) {
 
 	// type 0-2 must be int
 	if((type >= 0 && type <= 2) && !ctx.arg(2).isInt()) {
-		// TODO log error
+		ctx.printOpcodeError("invalid value, expected INT");
 
 		ctx.setReturn(-1, sfall::script::DataType::INT);
 		return;
 	}
 	// type 3 must be string
 	else if(type == 3 && !ctx.arg(2).isString()) {
-		// TODO log error
+		ctx.printOpcodeError("invalid value, expected STRING");
 
 		ctx.setReturn(-1, sfall::script::DataType::INT);
 		return;
@@ -206,6 +281,7 @@ void r_write(sfall::script::OpcodeContext& ctx) {
 			sfall::SafeWriteStr(addr, ctx.arg(2).strValue());
 			break;
 		default:
+			ctx.printOpcodeError("invalid write type<%d>", type);
 			ctx.setReturn(-1, sfall::script::DataType::INT);
 			return;
 	}
@@ -219,6 +295,9 @@ static const sfall::script::SfallMetarule metarules[] = {
 	{ "r_get_ini_string",     r_get_ini_string,        4, 4, -1, {sfall::script::ARG_STRING, sfall::script::ARG_STRING, sfall::script::ARG_STRING, sfall::script::ARG_STRING} },
 	{ "r_message_box",        r_message_box,           1, 4, -1, {sfall::script::ARG_STRING, sfall::script::ARG_INT, sfall::script::ARG_INT, sfall::script::ARG_INT} },
 
+	// voodoo
+	{ "r_call_offset_push",   r_call_offset_push,      1, 1, -1, {sfall::script::ARG_INT} },
+	{ "r_call_offset",        r_call_offset,           1, 1, -1, {sfall::script::ARG_INT} },
 	{ "r_write",              r_write,                 3, 3, -1, {sfall::script::ARG_INT, sfall::script::ARG_INT, sfall::script::ARG_INTSTR} },
 
 	{ "rotators",             r_otators,               0, 0 }
@@ -271,8 +350,11 @@ void sfall::Script::init() {
 		sfall::dlog_f("> sfall_func%s(\"%s\"%s)\n", DL_INIT, name.c_str(), metarule->name, args.c_str());
 		sfall::script::metaruleTable[metarule->name] = metarule;
 	}
+
 	// Needed for various voodoo magic
 	SafeWrite32(0x410004, (DWORD)&VirtualProtect);
+	std::memset(call_offset_buff, 0, sizeof(call_offset_buff));
+	call_offset_args = 0;
 }
 
 void sfall::Script::exit() {
