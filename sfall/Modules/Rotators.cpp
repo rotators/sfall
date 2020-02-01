@@ -87,6 +87,42 @@ void* rfall::db::fastread(const char* filename)
 	return nullptr;
 }
 
+// Fixes the bug that causes the barter button to not animate until after leaving the trade screen. 
+// The bug is due to the pointers to the frm graphics not being loaded, causing the button the get default graphics (and no button_down graphic),
+// so we insert a hook in gdialog_window_create_ before the button is added to the window. In this hook function we load the graphic.
+int dialogInitHook = 0x44A78B;
+static void __declspec(naked) DialogButtonFix() {
+	__asm {
+		push 0
+		mov edx, 0x60
+		mov eax, 0x6
+		xor ecx, ecx
+		xor ebx, ebx
+		call fo::funcoffs::art_id_
+		mov ecx, 0x58F46C
+		xor ebx, ebx
+		xor edx, edx
+		call fo::funcoffs::art_ptr_lock_data_
+		mov ds : [0x0058F4AC] , eax  // _dialog_red_button_up_buf
+		test eax, eax
+		je ret_ // null ptr
+		push 0
+		mov edx, 0x5F
+		mov eax, 0x6
+		xor ecx, ecx
+		xor ebx, ebx
+		call fo::funcoffs::art_id_
+		mov ecx, 0x58F4BC
+		xor ebx, ebx
+		xor edx, edx
+		call fo::funcoffs::art_ptr_lock_data_
+		mov ds : [0x0058F4A4], eax // _dialog_red_button_down_buf
+		mov ebp, eax
+	ret_:
+		jmp dialogInitHook
+	}
+}
+
 // Misc stuff
 
 void rfall::misc::CriticalFail(const std::string& message) {
@@ -165,6 +201,8 @@ void sfall::Rotators::init() {
 		dlogr("> configuration not found", DL_INIT);
 
 	SafeWrite8(0x410003, 0xF4);
+
+	MakeJump(0x44A785, DialogButtonFix);
 
 	SubModules.add<HTTPD>(); // dummy on v140_xp
 	SubModules.add<LoadDll>();
