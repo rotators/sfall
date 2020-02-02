@@ -242,12 +242,13 @@ void sfall::Rotators::init() {
 		dlogr("> configuration not found", DL_INIT);
 
 	SafeWrite8(0x410003, 0xF4);
+	// 0x410004 - 0x410007 used by Script submodule
 
 	MakeJump(0x44A785, DialogButtonFix);
 	MakeJump(0x41CC98, ClearAutomap);
 	MakeJump(0x41CD29, RestoreAutomapCode);
 
-	SubModules.add<HTTPD>(); // dummy on v140_xp
+	SubModules.add<HTTPD>();
 	SubModules.add<LoadDll>();
 	SubModules.add<Script>();
 

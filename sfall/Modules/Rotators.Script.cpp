@@ -295,66 +295,84 @@ static const sfall::script::SfallMetarule metarules[] = {
 	{ "r_get_ini_string",     r_get_ini_string,        4, 4, -1, {sfall::script::ARG_STRING, sfall::script::ARG_STRING, sfall::script::ARG_STRING, sfall::script::ARG_STRING} },
 	{ "r_message_box",        r_message_box,           1, 4, -1, {sfall::script::ARG_STRING, sfall::script::ARG_INT, sfall::script::ARG_INT, sfall::script::ARG_INT} },
 
-	// voodoo
+	{ "rotators",             r_otators,               0, 0 }
+};
+
+static const sfall::script::SfallMetarule unsafe_metarules[] = {
 	{ "r_call_offset_push",   r_call_offset_push,      1, 1, -1, {sfall::script::ARG_INT} },
 	{ "r_call_offset",        r_call_offset,           1, 1, -1, {sfall::script::ARG_INT} },
 	{ "r_write",              r_write,                 3, 3, -1, {sfall::script::ARG_INT, sfall::script::ARG_INT, sfall::script::ARG_INTSTR} },
 
-	{ "rotators",             r_otators,               0, 0 }
+	{ "voodoo",               r_otators,               0, 0 }
 };
+
+void AddMetarule(const sfall::script::SfallMetarule* metarule, std::string info = std::string()) {
+	if (sfall::script::metaruleTable.find(metarule->name) != sfall::script::metaruleTable.end())
+		misc::CriticalFail("Metarule name collision: " + std::string(metarule->name));
+
+	if(!info.empty())
+		info = " (" + info + ")";
+
+	std::string name, args;
+	if (metarule->minArgs == metarule->maxArgs)
+		name = std::to_string(metarule->minArgs);
+	else // disallow?
+		name = "[" + std::to_string(metarule->minArgs) + "-" + std::to_string(metarule->maxArgs) + "]";
+
+	for (uint8_t arg = 0; arg < metarule->maxArgs; arg++) {
+		args += ", ";
+
+		if (arg + 1 > metarule->minArgs)
+			args += "[";
+
+		switch (metarule->argValidation[arg]) {
+			case sfall::script::ARG_ANY:
+				args += "ARG_ANY";
+				break;
+			case sfall::script::ARG_INT:
+				args += "ARG_INT";
+				break;
+			case sfall::script::ARG_OBJECT:
+				args += "ARG_OBJECT";
+				break;
+			case sfall::script::ARG_STRING:
+				args += "ARG_STRING";
+				break;
+			case sfall::script::ARG_INTSTR:
+				args += "ARG_INTSTR";
+				break;
+			case sfall::script::ARG_NUMBER:
+				args += "ARG_NUMBER";
+				break;
+			default:
+				args += "<" + std::to_string(metarule->argValidation[arg]) + ">";
+				break;
+		}
+		if (arg + 1 > metarule->minArgs)
+			args += "]";
+	}
+
+	sfall::dlog_f(">%s sfall_func%s(\"%s\"%s)\n", DL_INIT, info.c_str(), name.c_str(), metarule->name, args.c_str());
+	sfall::script::metaruleTable[metarule->name] = metarule;
+}
 
 void sfall::Script::init() {
 	for (auto metarule = std::begin(metarules); metarule != std::end(metarules); ++metarule) {
-		if (sfall::script::metaruleTable.find(metarule->name) != sfall::script::metaruleTable.end())
-			misc::CriticalFail("Metarule name collision: " + std::string(metarule->name));
-
-		std::string name, args;
-		if (metarule->minArgs == metarule->maxArgs)
-			name = std::to_string(metarule->minArgs);
-		else // disallow?
-			name = "[" + std::to_string(metarule->minArgs) + "-" + std::to_string(metarule->maxArgs) + "]";
-
-		for (uint8_t arg = 0; arg < metarule->maxArgs; arg++) {
-			args += ", ";
-
-			if (arg + 1 > metarule->minArgs)
-				args += "[";
-
-			switch (metarule->argValidation[arg]) {
-				case sfall::script::ARG_ANY:
-					args += "ARG_ANY";
-					break;
-				case sfall::script::ARG_INT:
-					args += "ARG_INT";
-					break;
-				case sfall::script::ARG_OBJECT:
-					args += "ARG_OBJECT";
-					break;
-				case sfall::script::ARG_STRING:
-					args += "ARG_STRING";
-					break;
-				case sfall::script::ARG_INTSTR:
-					args += "ARG_INTSTR";
-					break;
-				case sfall::script::ARG_NUMBER:
-					args += "ARG_NUMBER";
-					break;
-				default:
-					args += "<" + std::to_string(metarule->argValidation[arg]) + ">";
-					break;
-			}
-			if (arg + 1 > metarule->minArgs)
-				args += "]";
-		}
-
-		sfall::dlog_f("> sfall_func%s(\"%s\"%s)\n", DL_INIT, name.c_str(), metarule->name, args.c_str());
-		sfall::script::metaruleTable[metarule->name] = metarule;
+		AddMetarule(metarule);
 	}
 
-	// Needed for various voodoo magic
-	SafeWrite32(0x410004, (DWORD)&VirtualProtect);
+	Ini ddraw_ini;
+	if( !ddraw_ini.LoadFile("ddraw.ini") || !ddraw_ini.GetBool("Debugging", "AllowUnsafeScripting", false))
+		return;
+
+	for (auto metarule = std::begin(unsafe_metarules); metarule != std::end(unsafe_metarules); ++metarule) {
+		AddMetarule(metarule, "unsafe");
+	}
+
 	std::memset(call_offset_buff, 0, sizeof(call_offset_buff));
 	call_offset_args = 0;
+
+	SafeWrite32(0x410004, (DWORD)&VirtualProtect);
 }
 
 void sfall::Script::exit() {
