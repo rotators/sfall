@@ -322,6 +322,8 @@
     </ClInclude>
     <ClInclude Include="Modules\HTTP\Routing.h">
       <Filter>Modules\HTTP</Filter>
+    <ClInclude Include="Modules\Scripting\Handlers\Math.h">
+      <Filter>Modules\Scripting\Handlers</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -521,6 +523,9 @@
     </ClCompile>
     <ClCompile Include="CRC.cpp" />
     <ClCompile Include="CheckAddress.cpp" />
+    <ClCompile Include="Modules\SubModules\CombatBlock.cpp">
+      <Filter>Modules\SubModules</Filter>
+    </ClCompile>
     <ClCompile Include="Modules\PlayerModel.cpp">
       <Filter>Modules\SimplePatches</Filter>
     </ClCompile>
@@ -569,8 +574,8 @@
     <ClCompile Include="Modules\TalkingHeads.cpp">
       <Filter>Modules\Features</Filter>
     </ClCompile>
-    <ClCompile Include="Modules\SubModules\CombatBlock.cpp">
-      <Filter>Modules\SubModules</Filter>
+    <ClCompile Include="Modules\Scripting\Handlers\Math.cpp">
+      <Filter>Modules\Scripting\Handlers</Filter>
     </ClCompile>
     <ClCompile Include="Rotators.Ini.cpp" />
     <ClCompile Include="Modules\Rotators.cpp">
