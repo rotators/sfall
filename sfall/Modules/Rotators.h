@@ -69,6 +69,8 @@ struct misc {
 	static void FillListVector(FLV type, std::vector<fo::GameObject*>& vec, int8_t elevation = -1); // -2=all -1=current 0-2=specific
 };
 
+extern bool HRPOK;
+
 // Any and all configuration should be read from ddraw.rotators.ini; /artifacts/ddraw.rotators.ini should be updated to reflect code, when possible;
 // adds some extra work on PR/merge, but pays off in a long run
 

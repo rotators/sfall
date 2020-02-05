@@ -77,13 +77,13 @@ void r_get_ini_string(sfall::script::OpcodeContext& ctx) {
 // r_message_box() //
 
 // Known flags, with made up names
-// Probably needs testing behavior with conflicting flags (YESNO|CLEAN, NORMAL|TINY)
+// "Conflicting" flags (YESNO|CLEAN, NORMAL|TINY) seems to prioritize flag with smaller value
 enum DialogOutFlags : uint8_t {
 	DIALOGOUT_NORMAL      = 0x01, // uses regular graphic
 	DIALOGOUT_SMALL       = 0x02, // uses smaller graphic
 	DIALOGOUT_ALIGN_LEFT  = 0x04, // text moved to left
 	DIALOGOUT_ALIGN_TOP   = 0x08, // text moved to top
-	DIALOGOUT_YESNO       = 0x10, // DONE button replaced with YES/NO -- WIP, useless in scripts in current state
+	DIALOGOUT_YESNO       = 0x10, // DONE button replaced with YES/NO
 	DIALOGOUT_CLEAN       = 0x20  // no buttons
 };
 
@@ -169,6 +169,8 @@ void r_otators(sfall::script::OpcodeContext& ctx) {
 /*
 #define r_call_offset_push(val)   sfall_func("r_call_offset_push", val)
 #define r_call_offset(addr)       sfall_func("r_call_offset", addr)
+#define r_hrp                     sfall_func("r_hrp")
+#define r_hrp_offset(addr)        sfall_func("r_hrp_offset", addr)
 #define r_write_byte(addr,val)    sfall_func("r_write", 0, addr, val)
 #define r_write_short(addr,val)   sfall_func("r_write", 1, addr, val)
 #define r_write_int(addr,val)     sfall_func("r_write", 2, addr, val)
@@ -198,7 +200,7 @@ void r_call_offset(sfall::script::OpcodeContext& ctx) { // watcom
 	arg = 0;
 
 	// LTR -> RTL
-	if(call_offset_args > 5)
+	if(call_offset_args >= 6)
 		std::reverse(std::begin(call_offset_buff) + 4, std::begin(call_offset_buff) + call_offset_args);
 
 	__asm {
@@ -234,9 +236,8 @@ void r_call_offset(sfall::script::OpcodeContext& ctx) { // watcom
 	_check:
 		mov esi, call_offset_args;
 		cmp arg, esi;
-		je _call;
-		jmp _loop;
-	_call:
+		jne _loop;
+	//_call:
 		call addr;
 		mov result, eax;
 		pop esi;
@@ -246,6 +247,54 @@ void r_call_offset(sfall::script::OpcodeContext& ctx) { // watcom
 	call_offset_args = 0;
 
 	ctx.setReturn(result, sfall::script::DataType::INT);
+}
+
+void r_call_offset_cdecl(sfall::script::OpcodeContext& ctx) {
+	static int addr, arg, result;
+
+	addr = ctx.arg(0).asInt();
+	arg = 0;
+
+	// LTR -> RTL
+	if(call_offset_args >= 2)
+		std::reverse(std::begin(call_offset_buff), std::begin(call_offset_buff) + call_offset_args);
+
+	__asm {
+		nop;
+		push esi;
+		jmp _check;
+		hlt;
+	_loop:
+		mov esi, arg;
+		push call_offset_buff[esi*4];
+	//_inc:
+		inc arg;
+	_check:
+		mov esi, call_offset_args;
+		cmp arg, esi;
+		jne _loop;
+	//_call:
+		call addr;
+		mov result, eax;
+		mov eax, call_offset_args;
+		mov esi, 4;
+		mul esi;
+		add esp, eax;
+		pop esi;
+	}
+
+	std::memset(call_offset_buff, 0, sizeof(call_offset_buff));
+	call_offset_args = 0;
+
+	ctx.setReturn(result, sfall::script::DataType::INT);
+}
+
+void r_hrp(sfall::script::OpcodeContext& ctx) {
+	ctx.setReturn(HRPOK ? 1 : 0, sfall::script::DataType::INT);
+}
+
+void r_hrp_offset(sfall::script::OpcodeContext& ctx) {
+	ctx.setReturn(sfall::HRPAddress(ctx.arg(0).asInt()), sfall::script::DataType::INT);
 }
 
 void r_write(sfall::script::OpcodeContext& ctx) {
@@ -301,6 +350,9 @@ static const sfall::script::SfallMetarule metarules[] = {
 static const sfall::script::SfallMetarule unsafe_metarules[] = {
 	{ "r_call_offset_push",   r_call_offset_push,      1, 1, -1, {sfall::script::ARG_INT} },
 	{ "r_call_offset",        r_call_offset,           1, 1, -1, {sfall::script::ARG_INT} },
+	{ "r_call_offset_cdecl",  r_call_offset_cdecl,     1, 1, -1, {sfall::script::ARG_INT} },
+	{ "r_hrp",                r_hrp,                   0, 0,  0 },
+	{ "r_hrp_offset",         r_hrp_offset,            1, 1,  0, {sfall::script::ARG_INT} },
 	{ "r_write",              r_write,                 3, 3, -1, {sfall::script::ARG_INT, sfall::script::ARG_INT, sfall::script::ARG_INTSTR} },
 
 	{ "voodoo",               r_otators,               0, 0 }

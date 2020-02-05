@@ -16,6 +16,10 @@
 // Remember to wear protective goggles :)
 //
 
+// Declared in main.cpp
+namespace sfall { extern bool hrpIsEnabled; extern bool hrpVersionValid; }
+bool rfall::HRPOK = false;
+
 rfall::Ini rfall::ini;
 
 // Submodules handling
@@ -207,6 +211,9 @@ void sfall::Rotators::init() {
 
 	SafeWrite8(0x410003, 0xF4);
 	// 0x410004 - 0x410007 used by Script submodule
+
+	if (sfall::hrpIsEnabled && hrpVersionValid)
+		rfall::HRPOK = true;
 
 	MakeJump(0x41CC98, ClearAutomap);
 	MakeJump(0x41CD29, RestoreAutomapCode);
