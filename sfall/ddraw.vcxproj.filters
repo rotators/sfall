@@ -301,6 +301,9 @@
     <ClInclude Include="Modules\TalkingHeads.h">
       <Filter>Modules\Features</Filter>
     </ClInclude>
+    <ClInclude Include="Modules\Scripting\Handlers\Math.h">
+      <Filter>Modules\Scripting\Handlers</Filter>
+    </ClInclude>
     <ClInclude Include="Rotators.Ini.h" />
     <ClInclude Include="Modules\Rotators.h">
       <Filter>Modules</Filter>
@@ -322,9 +325,6 @@
     </ClInclude>
     <ClInclude Include="Modules\HTTP\Routing.h">
       <Filter>Modules\HTTP</Filter>
-    <ClInclude Include="Modules\Scripting\Handlers\Math.h">
-      <Filter>Modules\Scripting\Handlers</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
