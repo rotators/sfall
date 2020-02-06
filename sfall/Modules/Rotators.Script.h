@@ -2,21 +2,14 @@
 
 #include "Module.h"
 
-namespace sfall
+namespace rfall
 {
 
-class Script : public Module {
+class Script : public sfall::Module {
 public:
 	const char* name() { return "Script"; }
 	void init();
 	virtual void exit();
 };
-
-}
-
-namespace rfall
-{
-
-char* wmGetCurrentTerrainName();
 
 }

@@ -1,19 +1,7 @@
 #include <cstdint>
-
-#include "Rotators.HTTPD.h"
-#include "HTTP\HTML.h"
-#include "HTTP\Routing.h"
-
-// Used by other submodules to check if HTTPD is currently enabled, so it must be declared for v140_xp build
-uint16_t sfall::HTTPD::Port = 0;
-
-//#if _MSC_VER >= 1920
-
 #include <string>
 #include <thread>
 #include <map>
-
-#include <fstream>
 
 #include "..\main.h"
 #include "..\SafeWrite.h"
@@ -26,8 +14,14 @@ uint16_t sfall::HTTPD::Port = 0;
 #include "..\Lib\EmbeddableWebServer.h"
 
 #include "Rotators.h"
+#include "Rotators.HTTPD.h"
+#include "HTTP\HTML.h"
+#include "HTTP\Routing.h"
 
 using namespace rfall;
+
+// Used by other submodules to check if HTTPD is currently enabled
+uint16_t HTTPD::Port = 0;
 
 static struct Server server;
 
@@ -354,36 +348,19 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
 // Module
 
 static void Run() {
-	std::ofstream log;
-	log.open("rfall-httpd.txt", std::ios_base::out | std::ios_base::trunc);
-
-	log << "> config\n";
-	log.flush();
 	DocumentRoot = ini.GetStr("HTTPD", "DocumentRoot", ".");
 
-	log << "> serverInit\n";
-	log.flush();
 	serverInit(&server);
 
-	log << "> localhost\n";
-	log.flush();
 	struct sockaddr_in localhost = { 0 };
 	localhost.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 	localhost.sin_family = AF_INET;
-	localhost.sin_port = htons(sfall::HTTPD::Port); // maybe pass it as argument?
+	localhost.sin_port = htons(HTTPD::Port); // maybe pass it as argument?
 
-	log << "> malloc\n";
-	log.flush();
 	xfopenLoadFile   = (char*)malloc(200);
 	xfopenLoadedFrom = (char*)malloc(200);
-	log << "> xfopen_hook\n";
-	log.flush();
 	sfall::MakeCall(0x4DEFCD, xfopen_hook);
-	log << "> OnMainLoop\n";
-	log.flush();
 	sfall::MainLoopHook::OnMainLoop() += OnMainLoop;
-	log << "> InitRoutes()\n";
-	log.flush();
 	router = new Router();
 
 	// Switching map in Combat crashes the game and from WM it doesn't work, 
@@ -391,12 +368,10 @@ static void Run() {
 	//sfall::MainLoopHook::OnCombatLoop() += OnCombatLoop;
 	//sfall::Worldmap::OnWorldmapLoop() += OnWMLoop;
 
-	log << "> acceptConnectionsUntilStopped()\n";
-	log.flush();
 	acceptConnectionsUntilStopped(&server, (struct sockaddr*) & localhost, sizeof(localhost));
 }
 
-void sfall::HTTPD::init() {
+void HTTPD::init() {
 	// Cached in case value changes after init
 	Port = ini.GetInt("HTTPD", "Port", 0);
 	if (Port) {
@@ -405,13 +380,13 @@ void sfall::HTTPD::init() {
 		if (Port <= 1024 || std::count(banned.begin(), banned.end(), Port))
 			misc::CriticalFail("[HTTPD]->Port " + std::to_string(Port) + " invalid");
 
-		dlog_f( "> starting on port %u\n", DL_INIT, Port);
+		sfall::dlog_f( "> starting on port %u\n", DL_INIT, Port);
 		CreateThread(0, 0, (LPTHREAD_START_ROUTINE)Run, 0, 0, NULL);
 		// https://github.com/rotators/sfall/issues/2
 	}
 }
 
-void sfall::HTTPD::exit() {
+void HTTPD::exit() {
 	if (Port) {
 		serverDeInit(&server);
 	}

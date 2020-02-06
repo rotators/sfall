@@ -20,7 +20,7 @@
 
 using namespace rfall;
 
-namespace sfall
+namespace rfall
 {
 
 //
@@ -375,7 +375,7 @@ namespace sfall
 		if (!ini.GetBool("Debugging", "Sandbox", false))
 			return;
 
-		dlogr("> remember to wear protective goggles", DL_INIT);
+		sfall::dlogr("> remember to wear protective goggles", DL_INIT);
 
 		// xenum_files
 
@@ -388,7 +388,7 @@ namespace sfall
 
 		// display_win draw
 
-		MainLoopHook::OnMainLoop() += DrawOnDisplayWin;
+		sfall::MainLoopHook::OnMainLoop() += DrawOnDisplayWin;
 	}
 
 }

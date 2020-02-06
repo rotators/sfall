@@ -205,18 +205,18 @@ void rfall::misc::FillListVector(FLV type, std::vector<fo::GameObject*>& vec, in
 
 //
 
-void sfall::Rotators::init() {
+void rfall::Rotators::init() {
 	if (!rfall::ini.LoadFile("ddraw.rotators.ini"))
-		dlogr("> configuration not found", DL_INIT);
+		sfall::dlogr("> configuration not found", DL_INIT);
 
-	SafeWrite8(0x410003, 0xF4);
+	sfall::SafeWrite8(0x410003, 0xF4);
 	// 0x410004 - 0x410007 used by Script submodule
 
-	if (sfall::hrpIsEnabled && hrpVersionValid)
+	if (sfall::hrpIsEnabled && sfall::hrpVersionValid)
 		rfall::HRPOK = true;
 
-	MakeJump(0x41CC98, ClearAutomap);
-	MakeJump(0x41CD29, RestoreAutomapCode);
+	sfall::MakeJump(0x41CC98, ClearAutomap);
+	sfall::MakeJump(0x41CD29, RestoreAutomapCode);
 
 	SubModules.add<HTTPD>();
 	SubModules.add<LoadDll>();
@@ -229,6 +229,6 @@ void sfall::Rotators::init() {
 	SubModules.initAll();
 }
 
-void sfall::Rotators::exit() {
+void rfall::Rotators::exit() {
 	SubModules.exitAll();
 }

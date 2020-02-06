@@ -2,10 +2,10 @@
 
 #include "Module.h"
 
-namespace sfall
+namespace rfall
 {
 
-class LoadDll : public Module {
+class LoadDll : public sfall::Module {
 public:
     const char* name() { return "LoadDll"; }
     void init();

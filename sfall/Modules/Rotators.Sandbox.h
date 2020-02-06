@@ -6,10 +6,10 @@
 
 #include "Module.h"
 
-namespace sfall
+namespace rfall
 {
 
-class Sandbox : public Module {
+class Sandbox : public sfall::Module {
 public:
 	const char* name() { return "Sandbox"; }
 

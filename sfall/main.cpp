@@ -211,7 +211,7 @@ static void InitModules() {
 	manager.add<ScriptExtender>();
 
 	manager.add<DebugEditor>();
-	manager.add<Rotators>();
+	manager.add<rfall::Rotators>();
 
 	manager.initAll();
 

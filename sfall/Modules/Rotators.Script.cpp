@@ -408,7 +408,7 @@ void AddMetarule(const sfall::script::SfallMetarule* metarule, std::string info 
 	sfall::script::metaruleTable[metarule->name] = metarule;
 }
 
-void sfall::Script::init() {
+void Script::init() {
 	for (auto metarule = std::begin(metarules); metarule != std::end(metarules); ++metarule) {
 		AddMetarule(metarule);
 	}
@@ -424,8 +424,8 @@ void sfall::Script::init() {
 	std::memset(call_offset_buff, 0, sizeof(call_offset_buff));
 	call_offset_args = 0;
 
-	SafeWrite32(0x410004, (DWORD)&VirtualProtect);
+	sfall::SafeWrite32(0x410004, (DWORD)&VirtualProtect);
 }
 
-void sfall::Script::exit() {
+void Script::exit() {
 }

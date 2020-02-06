@@ -76,12 +76,7 @@ extern bool HRPOK;
 
 extern Ini ini;
 
-}
-
-namespace sfall
-{
-
-class Rotators : public Module {
+class Rotators : public sfall::Module {
 private:
 	rfall::SubModuleManager SubModules;
 
