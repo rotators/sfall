@@ -89,7 +89,7 @@ jobs:
 
            # "You're dead", he said. Keli waited. She couldn't think of any suitable reply.
            # "I'm not" lacked a certain style, while "Is it serious?" seemed somehow too frivolous.
-           sed -ri 's!0x501!0x600!' sfall/stdafx.h
+           sed -ri 's!0x[0]*501!0x600!' sfall/stdafx.h
 
            # "Temporary" workaround until VS2017 is (re)added to GHA
            if [ "${{ matrix.cfg.toolset }}" == "v142" ]; then
