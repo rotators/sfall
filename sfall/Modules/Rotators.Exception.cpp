@@ -4,6 +4,8 @@
 #include <PsApi.h>
 #include <TlHelp32.h>
 
+#include "../Logging.h"
+
 #include "Rotators.h"
 #include "Rotators.Exception.h"
 
@@ -57,6 +59,8 @@ LONG WINAPI ExceptionHandler(EXCEPTION_POINTERS* ex) {
 			fprintf(f, STR_APP_OS, ver.dwMajorVersion, ver.dwMinorVersion, ver.dwBuildNumber, ver.szCSDVersion);
 
 		// TODO timestamp
+
+		fprintf(f,"\n");
 
 		if(ex) {
 			fprintf(f, STR_EX);
@@ -157,17 +161,10 @@ LONG WINAPI ExceptionHandler(EXCEPTION_POINTERS* ex) {
 				if(ex)
 					memcpy(&context, ex->ContextRecord, sizeof(CONTEXT));
 				else {
-					//#ifdef FO_X86
-					__asm     label:
-					__asm mov[context.Ebp], ebp;
-					__asm     mov[context.Esp], esp;
+					__asm label : __asm mov[context.Ebp], ebp;
+					__asm mov[context.Esp], esp;
 					__asm mov eax, [label];
-					__asm     mov[context.Eip], eax;
-					/*
-					# else // FO_X64
-					RtlCaptureContext(&context);
-					# endif
-					*/
+					__asm mov[context.Eip], eax;
 				}
 			}
 			else {
@@ -179,7 +176,6 @@ LONG WINAPI ExceptionHandler(EXCEPTION_POINTERS* ex) {
 			STACKFRAME64 stack;
 			memset(&stack, 0, sizeof(stack));
 
-			//#ifdef FO_X86
 			DWORD machine_type = IMAGE_FILE_MACHINE_I386;
 			stack.AddrFrame.Mode = AddrModeFlat;
 			stack.AddrFrame.Offset = context.Ebp;
@@ -187,19 +183,8 @@ LONG WINAPI ExceptionHandler(EXCEPTION_POINTERS* ex) {
 			stack.AddrPC.Offset = context.Eip;
 			stack.AddrStack.Mode = AddrModeFlat;
 			stack.AddrStack.Offset = context.Esp;
-			/*
-			#else // FO_X64
-			DWORD machine_type = IMAGE_FILE_MACHINE_AMD64;
-			stack.AddrPC.Offset = context.Rip;
-			stack.AddrPC.Mode = AddrModeFlat;
-			stack.AddrFrame.Offset = context.Rsp;
-			stack.AddrFrame.Mode = AddrModeFlat;
-			stack.AddrStack.Offset = context.Rsp;
-			stack.AddrStack.Mode = AddrModeFlat;
-			#endif
-			*/
 
-			# define STACKWALK_MAX_NAMELEN    (1024)
+			#define STACKWALK_MAX_NAMELEN    (1024)
 			char symbol_buffer[sizeof(SYMBOL_INFO) + STACKWALK_MAX_NAMELEN];
 			SYMBOL_INFO* symbol = (SYMBOL_INFO*)symbol_buffer;
 			memset(symbol, 0, sizeof(SYMBOL_INFO) + STACKWALK_MAX_NAMELEN);
@@ -234,7 +219,7 @@ LONG WINAPI ExceptionHandler(EXCEPTION_POINTERS* ex) {
 						CHAR    loadedImageName[STACKWALK_MAX_NAMELEN];
 					};
 
-					static void OnCallstackEntry(FILE* f, int frame_num, CallstackEntry& entry) {
+					static void OnCallstackEntry(FILE* fd, int frame_num, CallstackEntry& entry) {
 						if(frame_num >= 0 && entry.offset != 0) {
 							if(entry.name[0] == 0)
 								strcpy_s(entry.name, "(function-name not available)");
@@ -245,11 +230,13 @@ LONG WINAPI ExceptionHandler(EXCEPTION_POINTERS* ex) {
 							if(entry.moduleName[0] == 0)
 								strcpy_s(entry.moduleName, "???");
 
-							fprintf(f, "\t%s, %s + %lld", entry.moduleName, entry.name, entry.offsetFromSmybol);
+							fprintf(fd, "\t[0x%08x] ", static_cast<uint32_t>(entry.offset));
+							// TODO there is something seriously broken here, any change to format can break arguments
+							fprintf(fd, "%s, %s + 0x%x", entry.moduleName, entry.name, static_cast<uint32_t>(entry.offsetFromSmybol));
 							if(entry.lineFileName[0] != 0)
-								fprintf(f, ", %s (%d)\n", entry.lineFileName, entry.lineNumber);
+								fprintf(fd, ", %s (%d)\n", entry.lineFileName, entry.lineNumber);
 							else
-								fprintf(f, "\n");
+								fprintf(fd, "\n");
 						}
 					}
 				};
@@ -262,14 +249,15 @@ LONG WINAPI ExceptionHandler(EXCEPTION_POINTERS* ex) {
 				memset(&line, 0, sizeof(line));
 				line.SizeOfStruct = sizeof(line);
 
-				if(stack.AddrPC.Offset == stack.AddrReturn.Offset)
-				{
-					fprintf(f, "\tEndless callstack!\n"); // , 0, stack.AddrPC.Offset);
-					break;
+				if(stack.AddrPC.Offset == stack.AddrReturn.Offset) {
+					static const uint8_t frame_limit = 255;
+					if(frame_num >= frame_limit) {
+						fprintf(f, "\tEndless callstack!\n");
+						break;
+					}
 				}
 
-				if(stack.AddrPC.Offset != 0)
-				{
+				if(stack.AddrPC.Offset != 0) {
 					if(SymFromAddr(process, stack.AddrPC.Offset, &callstack.offsetFromSmybol, symbol)) {
 						strcpy_s(callstack.name, symbol->Name);
 						UnDecorateSymbolName(symbol->Name, callstack.undName, STACKWALK_MAX_NAMELEN, UNDNAME_NAME_ONLY);
@@ -310,11 +298,11 @@ LONG WINAPI ExceptionHandler(EXCEPTION_POINTERS* ex) {
 							case SymSym:
 								callstack.symTypeString = "SYM";
 								break;
-								# if API_VERSION_NUMBER >= 9
+								#if API_VERSION_NUMBER >= 9
 							case SymDia:
 								callstack.symTypeString = "DIA";
 								break;
-								# endif
+								#endif
 							case SymVirtual:
 								callstack.symTypeString = "Virtual";
 								break;
@@ -340,6 +328,7 @@ LONG WINAPI ExceptionHandler(EXCEPTION_POINTERS* ex) {
 			CloseHandle(t);
 		}
 
+		SymCleanup(process);
 		CloseHandle(process);
 		fclose(f);
 	} // if(f)
@@ -349,5 +338,8 @@ LONG WINAPI ExceptionHandler(EXCEPTION_POINTERS* ex) {
 }
 
 void Exception::init() {
-	SetUnhandledExceptionFilter(ExceptionHandler);
+	if(ini.GetBool("Debugging", "CatchExceptions", false)) {
+		sfall::dlog_f("> enabled\n", DL_INIT);
+		SetUnhandledExceptionFilter(ExceptionHandler);
+	}
 }

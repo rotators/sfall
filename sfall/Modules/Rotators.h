@@ -71,8 +71,8 @@ struct misc {
 
 extern bool HRPOK;
 
-// Any and all configuration should be read from ddraw.rotators.ini; /artifacts/ddraw.rotators.ini should be updated to reflect code, when possible;
-// adds some extra work on PR/merge, but pays off in a long run
+// Any and all configuration should be read from ddraw.rotators.ini, unless ddraw.ini have fitting option included already;
+// artifacts/ddraw.rotators.ini should be updated to reflect code, when possible
 
 extern Ini ini;
 
