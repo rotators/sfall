@@ -7,6 +7,7 @@
 #include "..\FalloutEngine\Fallout2.h"
 
 #include "Rotators.h"
+#include "Rotators.Exception.h"
 #include "Rotators.HTTPD.h"
 #include "Rotators.LoadDll.h"
 #include "Rotators.Sandbox.h"
@@ -225,6 +226,8 @@ void rfall::Rotators::init() {
 	#if _MSC_VER >= 1920
 	SubModules.add<Sandbox>();
 	#endif
+
+	SubModules.add<Exception>();
 
 	SubModules.initAll();
 }

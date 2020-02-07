@@ -285,7 +285,7 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
 		auto table = new HTMLTable();
 		auto tbody = table->createBody();
 		table->width = 1200;
-		table->headers = { "Id", "protoId", "scriptId", "scriptData", "x", "y", "sx", "sy", "rotation", "frm", "artFid", "artName" };
+		table->headers = { "Id", "protoId", "scriptId", "scriptData", "tile", "x", "y", "sx", "sy", "rotation", "frm", "artFid", "artName" };
 		
 		for (auto& obj : vec) {
 			auto tr = HTMLElement::tr();
@@ -311,6 +311,7 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
 			else
 				scriptData += "nullptr";
 			tr->_(h(td, scriptData))
+			  ->_(h(td, _s(obj->tile)))
 			  ->_(h(td, _s(obj->x)))
 			  ->_(h(td, _s(obj->y)))
 			  ->_(h(td, _s(obj->sx)))

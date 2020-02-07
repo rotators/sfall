@@ -380,6 +380,7 @@
     <ClInclude Include="Modules\ExtraSaveSlots.h" />
     <ClInclude Include="Rotators.Ini.h" />
     <ClInclude Include="Modules\Rotators.h" />
+    <ClInclude Include="Modules\Rotators.Exception.h" />
     <ClInclude Include="Modules\Rotators.HTTPD.h" />
     <ClInclude Include="Modules\Rotators.LoadDll.h" />
     <ClInclude Include="Modules\Rotators.Sandbox.h" />
@@ -485,6 +486,7 @@
     <ClCompile Include="Utils.cpp" />
     <ClCompile Include="Rotators.Ini.cpp" />
     <ClCompile Include="Modules\Rotators.cpp" />
+    <ClCompile Include="Modules\Rotators.Exception.cpp" />
     <ClCompile Include="Modules\Rotators.HTTPD.cpp" />
     <ClCompile Include="Modules\Rotators.LoadDll.cpp" />
     <ClCompile Include="Modules\Rotators.Sandbox.cpp" />

@@ -308,6 +308,9 @@
     <ClInclude Include="Modules\Rotators.h">
       <Filter>Modules</Filter>
     </ClInclude>
+    <ClInclude Include="Modules\Rotators.Exception.h">
+      <Filter>Modules</Filter>
+    </ClInclude>
     <ClInclude Include="Modules\Rotators.HTTPD.h">
       <Filter>Modules</Filter>
     </ClInclude>
@@ -579,6 +582,9 @@
     </ClCompile>
     <ClCompile Include="Rotators.Ini.cpp" />
     <ClCompile Include="Modules\Rotators.cpp">
+      <Filter>Modules</Filter>
+    </ClCompile>
+    <ClCompile Include="Modules\Rotators.Exception.cpp">
       <Filter>Modules</Filter>
     </ClCompile>
     <ClCompile Include="Modules\Rotators.HTTPD.cpp">
