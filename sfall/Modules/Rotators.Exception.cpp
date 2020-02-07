@@ -54,7 +54,7 @@ LONG WINAPI ExceptionHandler(EXCEPTION_POINTERS* ex) {
 		memset(&ver, 0, sizeof(OSVERSIONINFOA));
 		ver.dwOSVersionInfoSize = sizeof(ver);
 		if(GetVersionEx((OSVERSIONINFOA*)&ver))
-			fprintf(f, STR_OS, ver.dwMajorVersion, ver.dwMinorVersion, ver.dwBuildNumber, ver.szCSDVersion);
+			fprintf(f, STR_APP_OS, ver.dwMajorVersion, ver.dwMinorVersion, ver.dwBuildNumber, ver.szCSDVersion);
 
 		// TODO timestamp
 
