@@ -1,0 +1,56 @@
+#!/bin/bash
+#
+# https://github.com/x64dbg/x64dbg/wiki/Database-format
+#
+
+set -ex
+
+function idb2ida()
+{
+    local idb=$1
+    local ida=$2
+    local mod=$3
+    local adr=$4
+
+    # extract names
+    python3 pyidbutil/idbtool.py --names $idb > $ida.tmp
+
+    # remove trash lines
+    sed -ri '/^[A-Fa-f0-9]+:/!d' $ida.tmp
+
+    # ADDRESS: NAME -> MODULE ADDRESS BASE NAME
+    sed -ri 's!^[0]*([A-Fa-f0-9]+):[\t ]*!-=MODULE~NAME=- 0x\1 -=MODULE~BASE=- !g' $ida.tmp
+    sed -ri "s!-=MODULE~NAME=-!$mod!g" $ida.tmp
+    sed -ri "s!-=MODULE~BASE=-!$adr!g" $ida.tmp
+
+    # append
+    cat $ida.tmp >> $ida
+    rm -f $ida.tmp
+}
+
+# cleanup
+rm -f Fallout2.json
+
+# extract
+idb2ida Fallout2.idb Fallout2.json fallout2.exe 0x400000
+idb2ida f2_res.idb   Fallout2.json f2_res.dll   0x10000000
+
+# jsonize
+# convert address to offset
+awk '{printf "{ \"manual\": true, \"module\": \"%s\", \"address\": \"0x%x\", \"text\": \"%s\" },\n", $1, strtonum($2) - strtonum($3), $4 }' Fallout2.json > Fallout2.json.tmp
+mv Fallout2.json.tmp Fallout2.json
+
+# add first line
+sed -ri '1s!^!{ \"labels\":[\n!' Fallout2.json
+
+# remove last comma
+sed -ri '$ s!.$!!' Fallout2.json
+
+# add last line
+echo "]}" >> Fallout2.json
+
+# prettify
+jq '.' Fallout2.json > Fallout2.dd32
+
+# cleanup
+rm -f Fallout2.json

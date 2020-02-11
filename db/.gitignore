@@ -1,0 +1,7 @@
+# git clone https://github.com/nlitsme/pyidbutil
+pyidbutil/.git/
+pyidbutil/__pycache__/
+
+*.idb
+
+Fallout2.json*
