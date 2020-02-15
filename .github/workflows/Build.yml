@@ -75,11 +75,11 @@ jobs:
 
   # "Temporary" workaround until https://github.com/actions/virtual-environments/pull/289 is merged
   # Takes awful amount of time :(
-  - name:  Install Microsoft.VisualStudio.Component.WinXP
-    if:    env.GHA_RUN == 'true' && matrix.cfg.toolset == 'v140_xp'
-    run:   |
-           "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" modify --channelId VisualStudio.16.Release --productId Microsoft.VisualStudio.Product.Enterprise -q --add Microsoft.VisualStudio.Component.WinXP
-    shell: cmd
+  # name:  Install Microsoft.VisualStudio.Component.WinXP
+  # if:    env.GHA_RUN == 'true' && matrix.cfg.toolset == 'v140_xp'
+  # run:   |
+  #        "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" modify --channelId VisualStudio.16.Release --productId Microsoft.VisualStudio.Product.Enterprise -q --add Microsoft.VisualStudio.Component.WinXP
+  # shell: cmd
 
   - name:  Build
     if:    env.GHA_RUN == 'true'
@@ -100,13 +100,15 @@ jobs:
               # (Try to) build solution as intended, but prevent it from failing the job
 
               ok=1
-              "$($HOME/cache/vswhere.exe -latest -requires Microsoft.Component.MSBuild -find MSBuild/**/Bin/MSBuild.exe)" sfall/ddraw.sln -p:Configuration=${{ matrix.cfg.configuration }} -p:Platform=Win32 -p:PlatformToolset=${{ matrix.cfg.toolset }}|| ok=0
+              #"$($HOME/cache/vswhere.exe -latest -requires Microsoft.Component.MSBuild -find MSBuild/**/Bin/MSBuild.exe)" sfall/ddraw.sln -p:Configuration=${{ matrix.cfg.configuration }} -p:Platform=Win32 -p:PlatformToolset=${{ matrix.cfg.toolset }}|| ok=0
+              "$(vswhere.exe -latest -requires Microsoft.Component.MSBuild -find MSBuild/**/Bin/MSBuild.exe)" sfall/ddraw.sln -p:Configuration=${{ matrix.cfg.configuration }} -p:Platform=Win32 -p:PlatformToolset=${{ matrix.cfg.toolset }}|| ok=0
 
               if [ $ok -eq 1 ]; then
                  echo ::set-env name=GHA_BUILD::OK
               fi
            else
-              "$($HOME/cache/vswhere.exe -latest -requires Microsoft.Component.MSBuild -find MSBuild/**/Bin/MSBuild.exe)" sfall/ddraw.sln -p:Configuration=${{ matrix.cfg.configuration }} -p:Platform=Win32 -p:PlatformToolset=${{ matrix.cfg.toolset }}
+              #"$($HOME/cache/vswhere.exe -latest -requires Microsoft.Component.MSBuild -find MSBuild/**/Bin/MSBuild.exe)" sfall/ddraw.sln -p:Configuration=${{ matrix.cfg.configuration }} -p:Platform=Win32 -p:PlatformToolset=${{ matrix.cfg.toolset }}
+              "$(vswhere.exe -latest -requires Microsoft.Component.MSBuild -find MSBuild/**/Bin/MSBuild.exe)" sfall/ddraw.sln -p:Configuration=${{ matrix.cfg.configuration }} -p:Platform=Win32 -p:PlatformToolset=${{ matrix.cfg.toolset }}
               echo ::set-env name=GHA_BUILD::OK
            fi
     shell: bash
