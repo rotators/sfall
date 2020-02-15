@@ -70,14 +70,6 @@ jobs:
            du -hd0 $HOME/cache
     shell: bash
 
-  # "Temporary" workaround until https://github.com/actions/virtual-environments/pull/289 is merged
-  # Takes awful amount of time :(
-  # name:  Install Microsoft.VisualStudio.Component.WinXP
-  # if:    env.GHA_RUN == 'true' && matrix.cfg.toolset == 'v140_xp'
-  # run:   |
-  #        "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" modify --channelId VisualStudio.16.Release --productId Microsoft.VisualStudio.Product.Enterprise -q --add Microsoft.VisualStudio.Component.WinXP
-  # shell: cmd
-
   - name:  Build
     if:    env.GHA_RUN == 'true'
     run:   |
@@ -88,7 +80,7 @@ jobs:
            # "I'm not" lacked a certain style, while "Is it serious?" seemed somehow too frivolous.
            sed -ri 's!(0x[0]*501|_WIN32_WINNT_WINXP)!0x0600!' sfall/stdafx.h
 
-           # "Temporary" workaround until VS2017 is (re)added to GHA
+           # Kinda required for v142 build
            if [ "${{ matrix.cfg.toolset }}" == "v142" ]; then
               sed -ri 's!<EnableEnhancedInstructionSet>NoExtensions</EnableEnhancedInstructionSet>!<EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>!' sfall/ddraw.vcxproj
            fi
