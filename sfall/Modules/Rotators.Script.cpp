@@ -423,8 +423,6 @@ void Script::init() {
 
 	std::memset(call_offset_buff, 0, sizeof(call_offset_buff));
 	call_offset_args = 0;
-
-	sfall::SafeWrite32(0x410004, (DWORD)&VirtualProtect);
 }
 
 void Script::exit() {

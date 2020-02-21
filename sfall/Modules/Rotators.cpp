@@ -92,47 +92,6 @@ void* rfall::db::fastread(const char* filename)
 	return nullptr;
 }
 
-#define AUTOMAP_CODESIZE 0x750
-int initAutomap = 0x41CCA2;
-int autoMapmem = 0x41AE05;
-char* scriptAsmCode = new char[AUTOMAP_CODESIZE];
-// To make sure script added asm code doesn't get copied into automap data
-static void __declspec(naked) ClearAutomap() {
-	__asm {
-		pushad
-	}
- 
-	memcpy(scriptAsmCode, (void*)autoMapmem, AUTOMAP_CODESIZE);
-	sfall::SafeMemSet(autoMapmem, 0, AUTOMAP_CODESIZE);
-	__asm {
-		popad
-		push ecx
-		push edx
-		push esi
-		push edi
-		sub esp, 0x200
-		jmp initAutomap
-	}
-}
-
-int initAutomapRet = 0x41CD33;
-// Restore code written to automap area by script
-static void __declspec(naked) RestoreAutomapCode() {
-	__asm {
-		pushad
-	}
-	sfall::SafeWriteBytes(autoMapmem, (BYTE*)scriptAsmCode, AUTOMAP_CODESIZE);
-	__asm {
-		popad
-		add esp, 0x200
-		pop edi
-		pop esi
-		pop edx
-		pop ecx
-		jmp initAutomapRet
-	}
-}
-
 // Misc stuff
 
 void rfall::misc::CriticalFail(const std::string& message) {
@@ -211,13 +170,9 @@ void rfall::Rotators::init() {
 		sfall::dlogr("> configuration not found", DL_INIT);
 
 	sfall::SafeWrite8(0x410003, 0xF4);
-	// 0x410004 - 0x410007 used by Script submodule
 
 	if (sfall::hrpIsEnabled && sfall::hrpVersionValid)
 		rfall::HRPOK = true;
-
-	sfall::MakeJump(0x41CC98, ClearAutomap);
-	sfall::MakeJump(0x41CD29, RestoreAutomapCode);
 
 	SubModules.add<HTTPD>();
 	SubModules.add<LoadDll>();
