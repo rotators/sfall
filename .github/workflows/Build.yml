@@ -80,6 +80,9 @@ jobs:
            # "I'm not" lacked a certain style, while "Is it serious?" seemed somehow too frivolous.
            sed -ri 's!(0x[0]*501|_WIN32_WINNT_WINXP)!0x0600!' sfall/stdafx.h
 
+           # Generate map file
+           sed -ri 's!</Link>!  <GenerateMapFile>true</GenerateMapFile>\n      <MapFileName>$(TargetDir)$(TargetName).map</MapFileName>\n      <MapExports>true</MapExports>\n    </Link>!g' sfall/ddraw.vcxproj
+
            # Kinda required for v142 build
            if [ "${{ matrix.cfg.toolset }}" == "v142" ]; then
               sed -ri 's!<EnableEnhancedInstructionSet>NoExtensions</EnableEnhancedInstructionSet>!<EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>!' sfall/ddraw.vcxproj
@@ -111,6 +114,7 @@ jobs:
            mkdir -p ddraw
            cp $ddraw.dll ddraw/ddraw.dll
            mv $ddraw.dll ddraw/ddraw.rotators.dll
+           mv $ddraw.map ddraw/ddraw.map
     shell: bash
 
   - uses: actions/upload-artifact@v1
